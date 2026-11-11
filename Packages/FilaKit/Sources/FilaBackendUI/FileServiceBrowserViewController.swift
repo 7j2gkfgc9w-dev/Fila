@@ -144,9 +144,15 @@
             ) { [weak self] _ in
                 self?.reload()
             }
+            let newFolder = UIAction(
+                title: String(localized: "New Folder", bundle: bundle),
+                image: UIImage(systemName: "folder.badge.plus"),
+            ) { [weak self] _ in
+                self?.promptNewFolder()
+            }
             return [
                 UIMenu(options: .displayInline, children: [toggle]),
-                UIMenu(options: .displayInline, children: [refresh]),
+                UIMenu(options: .displayInline, children: [newFolder, refresh]),
                 settingsMenuElement,
             ]
         }
@@ -395,6 +401,246 @@
             }
         }
 
+        // MARK: - Remote filesystem operations
+
+        private func writableService() async throws -> any WritableFileService {
+            let service = try await backend.fileService()
+            guard let writable = service as? any WritableFileService else {
+                throw NSError(
+                    domain: "Fila.RemoteFileActions",
+                    code: 405,
+                    userInfo: [NSLocalizedDescriptionKey: String(
+                        localized: "This server does not support changes.",
+                        bundle: bundle,
+                    )],
+                )
+            }
+            return writable
+        }
+
+        private func reportRemoteError(_ error: Error, title: String) {
+            BackendScreens.shell?.alert(
+                title: title,
+                message: BackendScreens.shell?.failureText(for: error) ?? error.localizedDescription,
+            )
+        }
+
+        private func promptNewFolder() {
+            let alert = UIAlertController(
+                title: String(localized: "New Folder", bundle: bundle),
+                message: nil,
+                preferredStyle: .alert,
+            )
+            alert.addTextField { field in
+                field.placeholder = String(localized: "Folder name", bundle: self.bundle)
+                field.autocapitalizationType = .sentences
+            }
+            alert.addAction(UIAlertAction(
+                title: String(localized: "Cancel", bundle: bundle),
+                style: .cancel,
+            ))
+            alert.addAction(UIAlertAction(
+                title: String(localized: "Create", bundle: bundle),
+                style: .default,
+            ) { [weak self, weak alert] _ in
+                guard let self, let name = alert?.textFields?.first?.text else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    do {
+                        let destination = try path.appending(name)
+                        try await writableService().createDirectory(destination)
+                        backend.invalidate([path])
+                        reload()
+                        BackendScreens.shell?.toast(String(localized: "Folder created", bundle: bundle))
+                    } catch {
+                        reportRemoteError(error, title: String(localized: "Could Not Create Folder", bundle: bundle))
+                    }
+                }
+            })
+            present(alert, animated: true)
+        }
+
+        private func promptRename(_ entry: FileEntry) {
+            let alert = UIAlertController(
+                title: String(localized: "Rename…", bundle: bundle),
+                message: nil,
+                preferredStyle: .alert,
+            )
+            alert.addTextField { field in
+                field.text = entry.name
+                field.clearButtonMode = .whileEditing
+            }
+            alert.addAction(UIAlertAction(
+                title: String(localized: "Cancel", bundle: bundle),
+                style: .cancel,
+            ))
+            alert.addAction(UIAlertAction(
+                title: String(localized: "Rename", bundle: bundle),
+                style: .default,
+            ) { [weak self, weak alert] _ in
+                guard let self, let name = alert?.textFields?.first?.text,
+                      name != entry.name else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    do {
+                        let source = try path.appending(entry.name)
+                        let destination = try path.appending(name)
+                        try await writableService().move(source, to: destination, policy: .failIfExists)
+                        backend.invalidate([path])
+                        reload()
+                        BackendScreens.shell?.toast(String(localized: "Renamed", bundle: bundle))
+                    } catch {
+                        reportRemoteError(error, title: String(localized: "Could Not Rename", bundle: bundle))
+                    }
+                }
+            })
+            present(alert, animated: true)
+        }
+
+        private func copyRemotePath(_ entry: FileEntry) {
+            guard let child = try? path.appending(entry.name) else { return }
+            UIPasteboard.general.string = backend.root.displayName + "/" + child.description
+            BackendScreens.shell?.toast(String(localized: "Copied", bundle: bundle))
+        }
+
+        private func showRemoteInformation(_ entry: FileEntry) {
+            guard let child = try? path.appending(entry.name) else { return }
+            let kind: String
+            switch entry.kind {
+            case .directory: kind = String(localized: "Folder", bundle: bundle)
+            case .file: kind = String(localized: "File", bundle: bundle)
+            case .symbolicLink: kind = String(localized: "Link", bundle: bundle)
+            case .other: kind = String(localized: "Other", bundle: bundle)
+            }
+            var lines = [
+                String(localized: "Type", bundle: bundle) + ": " + kind,
+                String(localized: "Path", bundle: bundle) + ": " + backend.root.displayName + "/" + child.description,
+            ]
+            if let size = entry.size {
+                lines.append(String(localized: "Size", bundle: bundle) + ": " +
+                    ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
+            }
+            if let modified = entry.modified {
+                lines.append(String(localized: "Modified", bundle: bundle) + ": " +
+                    modified.formatted(date: .abbreviated, time: .shortened))
+            }
+            let alert = UIAlertController(
+                title: entry.name,
+                message: lines.joined(separator: "\n"),
+                preferredStyle: .alert,
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        }
+
+        private func confirmDelete(_ entry: FileEntry) {
+            guard let shell = BackendScreens.shell else { return }
+            let isFolder = entry.kind == .directory
+            shell.confirmPermanentDeletion(
+                from: self,
+                title: String(localized: "Delete Permanently?", bundle: bundle),
+                message: isFolder
+                    ? String(localized: "Delete this folder and all of its contents permanently? This cannot be undone.", bundle: bundle)
+                    : String(localized: "Delete this file permanently? This cannot be undone.", bundle: bundle),
+                confirmTitle: String(localized: "Delete", bundle: bundle),
+            ) { [weak self] in
+                self?.performRemoteDelete(entry)
+            }
+        }
+
+        /// Build a complete leaf-first plan BEFORE deleting any item.
+        /// Symbolic links are removed as links, never followed into directories.
+        /// A 10,000-item limit refuses oversized operations before mutation.
+        private func deletionPlan(
+            service: any WritableFileService,
+            target: ServicePath,
+            isDirectory: Bool,
+        ) async throws -> [(path: ServicePath, directory: Bool)] {
+            var plan: [(path: ServicePath, directory: Bool)] = []
+            var stack: [(path: ServicePath, directory: Bool, visited: Bool)] = [
+                (target, isDirectory, false),
+            ]
+            while let item = stack.popLast() {
+                try Task.checkCancellation()
+                if !item.directory || item.visited {
+                    plan.append((item.path, item.directory))
+                    continue
+                }
+                stack.append((item.path, true, true))
+                var seen = Set<String>()
+                var children: [FileEntry] = []
+                for try await batch in try await service.list(item.path) {
+                    for child in batch {
+                        guard seen.insert(child.name).inserted else {
+                            throw NSError(
+                                domain: "Fila.RemoteFileActions",
+                                code: 409,
+                                userInfo: [NSLocalizedDescriptionKey: "Duplicate remote entry; deletion cancelled."],
+                            )
+                        }
+                        children.append(child)
+                        guard children.count + plan.count + stack.count <= 10_000 else {
+                            throw NSError(
+                                domain: "Fila.RemoteFileActions",
+                                code: 413,
+                                userInfo: [NSLocalizedDescriptionKey: "More than 10,000 items. Delete smaller folders."],
+                            )
+                        }
+                    }
+                }
+                for child in children.reversed() {
+                    let childPath = try item.path.appending(child.name)
+                    // A symbolic link resolving to a folder is still a link,
+                    // NOT a directory to traverse or recursively delete.
+                    stack.append((childPath, child.kind == .directory, false))
+                }
+            }
+            return plan
+        }
+
+        private func performRemoteDelete(_ entry: FileEntry) {
+            guard let shell = BackendScreens.shell else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    let service = try await writableService()
+                    let target = try path.appending(entry.name)
+                    let plan = try await deletionPlan(
+                        service: service,
+                        target: target,
+                        isDirectory: entry.kind == .directory,
+                    )
+                    _ = try await shell.withProgress(
+                        title: String(localized: "Deleting…", bundle: bundle),
+                        message: String(localized: "Deleting files from the server", bundle: bundle),
+                        cancellable: false,
+                        from: self,
+                    ) { update in
+                        for (index, item) in plan.enumerated() {
+                            try Task.checkCancellation()
+                            if item.directory {
+                                try await service.removeEmptyDirectory(item.path)
+                            } else {
+                                try await service.removeFile(item.path)
+                            }
+                            update("\(index + 1) / \(plan.count)")
+                        }
+                        return plan.count
+                    }
+                    backend.invalidate([path])
+                    reload()
+                    shell.toast(String(localized: "Deleted", bundle: bundle))
+                } catch {
+                    // A server can fail after removing some children. Always
+                    // re-list the folder and report the error, never retry
+                    // silently or claim the operation was atomic.
+                    backend.invalidate([path])
+                    reload()
+                    reportRemoteError(error, title: String(localized: "Could Not Delete", bundle: bundle))
+                }
+            }
+        }
+
         // MARK: - Wording
 
         static func detail(for entry: FileEntry) -> String? {
@@ -467,9 +713,32 @@
                         image: UIImage(systemName: "scissors"),
                     ) { _ in BackendScreens.shell?.takeToClipboard([location], cut: true) })
                 }
+                // Codex remote file management additions: the underlying SMB/WebDAV
+                // services already implement writes, but upstream 0.8.3 omitted
+                // their controls from this context menu.
+                let management: [UIMenuElement] = [
+                    UIAction(
+                        title: String(localized: "Rename…", bundle: bundle),
+                        image: UIImage(systemName: "pencil"),
+                    ) { [weak self] _ in self?.promptRename(entry) },
+                    UIAction(
+                        title: String(localized: "Copy Path", bundle: bundle),
+                        image: UIImage(systemName: "doc.on.clipboard"),
+                    ) { [weak self] _ in self?.copyRemotePath(entry) },
+                    UIAction(
+                        title: String(localized: "File Information", bundle: bundle),
+                        image: UIImage(systemName: "info.circle"),
+                    ) { [weak self] _ in self?.showRemoteInformation(entry) },
+                    UIAction(
+                        title: String(localized: "Delete Permanently", bundle: bundle),
+                        image: UIImage(systemName: "trash"),
+                        attributes: .destructive,
+                    ) { [weak self] _ in self?.confirmDelete(entry) },
+                ]
                 return UIMenu(title: entry.name, children: [
                     UIMenu(options: .displayInline, children: children),
                     UIMenu(options: .displayInline, children: transfer),
+                    UIMenu(options: .displayInline, children: management),
                 ])
             }
         }

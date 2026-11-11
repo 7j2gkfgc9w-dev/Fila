@@ -1,0 +1,70 @@
+name: Fila Custom IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/remote-file-actions
+    paths:
+      - ".github/workflows/fila-custom-ipa.yml"
+      - "Packages/FilaKit/Sources/FilaBackendUI/**"
+      - "Configuration/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fila-custom-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ipa:
+    name: Build modified sandboxed Fila
+    runs-on: xcode-27
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install packaging tools
+        run: brew install ldid dpkg
+
+      - name: Validate source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool Packages/FilaKit/Sources/FilaBackendUI/Resources/Localizable.xcstrings >/dev/null
+          xcrun swiftc -frontend -parse Packages/FilaKit/Sources/FilaBackendUI/FileServiceBrowserViewController.swift
+          git diff --check
+
+      - name: Set a safe build number above previously installed 161
+        shell: bash
+        run: |
+          set -euo pipefail
+          make set-version VERSION="$(make --no-print-directory print-version)" BUILD="$((1000 + GITHUB_RUN_NUMBER))"
+
+      - name: Compile, package and verify unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SANDBOX_DERIVED_DATA="$RUNNER_TEMP/fila-custom-sandboxed"
+          make ipa SANDBOX_DERIVED_DATA="$SANDBOX_DERIVED_DATA"
+          ls -lah build/Packages/*.ipa
+          shasum -a 256 build/Packages/*.ipa | tee build/Packages/FILA_CUSTOM_SHA256SUMS.txt
+
+      - name: Upload custom IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fila-Custom-IPA-${{ github.run_number }}
+          path: |
+            build/Packages/*.ipa
+            build/Packages/FILA_CUSTOM_SHA256SUMS.txt
+          retention-days: 30
+          if-no-files-found: error
