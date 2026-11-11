@@ -75,7 +75,7 @@ final class AppBackendShell: BackendShell {
     ) {
         let alert = AlertInputViewController(
             title: String.LocalizationValue("New Folder"),
-            message: String.LocalizationValue("Enter a name for the new folder."),
+            message: String.LocalizationValue("Enter a name for the new item in this folder."),
             placeholder: String.LocalizationValue("Folder name"),
             text: "",
             doneButtonText: String.LocalizationValue("Create"),
