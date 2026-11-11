@@ -431,13 +431,13 @@
                 guard let self else { return }
                 Task { @MainActor [self] in
                     do {
-                        let destination = try path.appending(name)
-                        try await writableService().createDirectory(destination)
-                        backend.invalidate([path])
-                        reload()
-                        shell.toast(String(localized: "Folder created", bundle: bundle))
+                        let destination = try self.path.appending(name)
+                        try await self.writableService().createDirectory(destination)
+                        self.backend.invalidate([self.path])
+                        self.reload()
+                        shell.toast(String(localized: "Folder created", bundle: self.bundle))
                     } catch {
-                        reportRemoteError(error, title: String(localized: "Could Not Create Folder", bundle: bundle))
+                        self.reportRemoteError(error, title: String(localized: "Could Not Create Folder", bundle: self.bundle))
                     }
                 }
             }
@@ -449,14 +449,14 @@
                 guard let self, name != entry.name else { return }
                 Task { @MainActor [self] in
                     do {
-                        let source = try path.appending(entry.name)
-                        let destination = try path.appending(name)
-                        try await writableService().move(source, to: destination, policy: .failIfExists)
-                        backend.invalidate([path])
-                        reload()
-                        shell.toast(String(localized: "Renamed", bundle: bundle))
+                        let source = try self.path.appending(entry.name)
+                        let destination = try self.path.appending(name)
+                        try await self.writableService().move(source, to: destination, policy: .failIfExists)
+                        self.backend.invalidate([self.path])
+                        self.reload()
+                        shell.toast(String(localized: "Renamed", bundle: self.bundle))
                     } catch {
-                        reportRemoteError(error, title: String(localized: "Could Not Rename", bundle: bundle))
+                        self.reportRemoteError(error, title: String(localized: "Could Not Rename", bundle: self.bundle))
                     }
                 }
             }
