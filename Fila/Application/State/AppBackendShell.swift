@@ -69,6 +69,41 @@ final class AppBackendShell: BackendShell {
         FeedbackAlert.show(title, message: message)
     }
 
+    func promptRemoteNewFolder(
+        from presenter: UIViewController,
+        onConfirm: @escaping @MainActor (String) -> Void,
+    ) {
+        let alert = AlertInputViewController(
+            title: String.LocalizationValue("New Folder"),
+            message: String.LocalizationValue("Enter a name for the new folder."),
+            placeholder: String.LocalizationValue("Folder name"),
+            text: "",
+            doneButtonText: String.LocalizationValue("Create"),
+            onConfirm: onConfirm,
+        ).typingLiterally()
+        presenter.present(alert, animated: true)
+    }
+
+    func promptRemoteRename(
+        from presenter: UIViewController,
+        currentName: String,
+        onConfirm: @escaping @MainActor (String) -> Void,
+    ) {
+        let alert = AlertInputViewController(
+            title: String.LocalizationValue("Rename"),
+            message: String.LocalizationValue("Enter a new name. The item stays in the same folder."),
+            placeholder: String.LocalizationValue("New name"),
+            text: currentName,
+            doneButtonText: String.LocalizationValue("Rename"),
+            onConfirm: onConfirm,
+        ).typingLiterally()
+        presenter.present(alert, animated: true)
+    }
+
+    func showRemoteInformation(from presenter: UIViewController, title: String, message: String) {
+        presenter.presentMessage(title, message: message)
+    }
+
     func confirmPermanentDeletion(
         from presenter: UIViewController,
         title: String,

@@ -426,75 +426,40 @@
         }
 
         private func promptNewFolder() {
-            let alert = UIAlertController(
-                title: String(localized: "New Folder", bundle: bundle),
-                message: nil,
-                preferredStyle: .alert,
-            )
-            alert.addTextField { field in
-                field.placeholder = String(localized: "Folder name", bundle: self.bundle)
-                field.autocapitalizationType = .sentences
-            }
-            alert.addAction(UIAlertAction(
-                title: String(localized: "Cancel", bundle: bundle),
-                style: .cancel,
-            ))
-            alert.addAction(UIAlertAction(
-                title: String(localized: "Create", bundle: bundle),
-                style: .default,
-            ) { [weak self, weak alert] _ in
-                guard let self, let name = alert?.textFields?.first?.text else { return }
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
+            guard let shell = BackendScreens.shell else { return }
+            shell.promptRemoteNewFolder(from: self) { [weak self] name in
+                guard let self else { return }
+                Task { @MainActor in
                     do {
                         let destination = try path.appending(name)
                         try await writableService().createDirectory(destination)
                         backend.invalidate([path])
                         reload()
-                        BackendScreens.shell?.toast(String(localized: "Folder created", bundle: bundle))
+                        shell.toast(String(localized: "Folder created", bundle: bundle))
                     } catch {
                         reportRemoteError(error, title: String(localized: "Could Not Create Folder", bundle: bundle))
                     }
                 }
-            })
-            present(alert, animated: true)
+            }
         }
 
         private func promptRename(_ entry: FileEntry) {
-            let alert = UIAlertController(
-                title: String(localized: "Rename…", bundle: bundle),
-                message: nil,
-                preferredStyle: .alert,
-            )
-            alert.addTextField { field in
-                field.text = entry.name
-                field.clearButtonMode = .whileEditing
-            }
-            alert.addAction(UIAlertAction(
-                title: String(localized: "Cancel", bundle: bundle),
-                style: .cancel,
-            ))
-            alert.addAction(UIAlertAction(
-                title: String(localized: "Rename", bundle: bundle),
-                style: .default,
-            ) { [weak self, weak alert] _ in
-                guard let self, let name = alert?.textFields?.first?.text,
-                      name != entry.name else { return }
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
+            guard let shell = BackendScreens.shell else { return }
+            shell.promptRemoteRename(from: self, currentName: entry.name) { [weak self] name in
+                guard let self, name != entry.name else { return }
+                Task { @MainActor in
                     do {
                         let source = try path.appending(entry.name)
                         let destination = try path.appending(name)
                         try await writableService().move(source, to: destination, policy: .failIfExists)
                         backend.invalidate([path])
                         reload()
-                        BackendScreens.shell?.toast(String(localized: "Renamed", bundle: bundle))
+                        shell.toast(String(localized: "Renamed", bundle: bundle))
                     } catch {
                         reportRemoteError(error, title: String(localized: "Could Not Rename", bundle: bundle))
                     }
                 }
-            })
-            present(alert, animated: true)
+            }
         }
 
         private func copyRemotePath(_ entry: FileEntry) {
@@ -524,13 +489,11 @@
                 lines.append(String(localized: "Modified", bundle: bundle) + ": " +
                     modified.formatted(date: .abbreviated, time: .shortened))
             }
-            let alert = UIAlertController(
+            BackendScreens.shell?.showRemoteInformation(
+                from: self,
                 title: entry.name,
                 message: lines.joined(separator: "\n"),
-                preferredStyle: .alert,
             )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            present(alert, animated: true)
         }
 
         private func confirmDelete(_ entry: FileEntry) {

@@ -45,6 +45,19 @@
         func toast(_ text: String)
         /// An error card with a title, a reason and OK.
         func alert(title: String, message: String)
+        /// Name entry cards live in the app where AlertController is linked,
+        /// not inside the shared backend UI package.
+        func promptRemoteNewFolder(
+            from presenter: UIViewController,
+            onConfirm: @escaping @MainActor (String) -> Void,
+        )
+        func promptRemoteRename(
+            from presenter: UIViewController,
+            currentName: String,
+            onConfirm: @escaping @MainActor (String) -> Void,
+        )
+        /// Neutral, informational card for a remote file or directory.
+        func showRemoteInformation(from presenter: UIViewController, title: String, message: String)
         /// The permanent-deletion card, under the destructive accent.
         func confirmPermanentDeletion(
             from presenter: UIViewController,
