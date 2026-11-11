@@ -429,7 +429,7 @@
             guard let shell = BackendScreens.shell else { return }
             shell.promptRemoteNewFolder(from: self) { [weak self] name in
                 guard let self else { return }
-                Task { @MainActor in
+                Task { @MainActor [self] in
                     do {
                         let destination = try path.appending(name)
                         try await writableService().createDirectory(destination)
@@ -447,7 +447,7 @@
             guard let shell = BackendScreens.shell else { return }
             shell.promptRemoteRename(from: self, currentName: entry.name) { [weak self] name in
                 guard let self, name != entry.name else { return }
-                Task { @MainActor in
+                Task { @MainActor [self] in
                     do {
                         let source = try path.appending(entry.name)
                         let destination = try path.appending(name)
