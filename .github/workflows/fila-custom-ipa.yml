@@ -8,6 +8,12 @@ on:
     paths:
       - ".github/workflows/fila-custom-ipa.yml"
       - "Packages/FilaKit/Sources/FilaBackendUI/**"
+      - "Packages/FilaKit/Sources/FilaBackendKit/**"
+      - "Packages/FilaKit/Sources/FilaSMB/**"
+      - "Packages/FilaKit/Sources/FilaWebDAV/**"
+      - "Fila/Application/**"
+      - "Fila/Resources/**"
+      - "Scripts/fila-remote-open-localizations.patch"
       - "Configuration/**"
 
 permissions:
