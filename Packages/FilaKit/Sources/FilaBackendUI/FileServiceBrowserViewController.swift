@@ -274,17 +274,38 @@
 
         // MARK: - Opening
 
+        /// A remote URL is handed to an external player without downloading.
+        /// A local viewer still uses the explicit, bounded snapshot action.
         private func open(_ entry: FileEntry) {
             guard let child = try? path.appending(entry.name) else { return }
             if entry.entersDirectory {
                 navigationController?.pushViewController(
-                    FileServiceBrowserViewController(backend: backend, path: child), animated: true,
+                    FileServiceBrowserViewController(backend: backend, path: child), animated: true
                 )
-            } else {
-                snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                return
+            }
+            let preview: @MainActor () -> Void = { [weak self] in
+                guard let self else { return }
+                self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
                     guard let self else { release(); return }
                     BackendScreens.shell?.preview(file, title: entry.name, from: self, released: release)
                 }
+            }
+            if let network = backend as? any RemoteOpenURLProviding,
+               let url = network.remoteOpenURL(for: child) {
+                let smallEnough = entry.size.map { $0 <= Self.previewSizeLimit } == true
+                let mediaTypes: Set<String> = [
+                    "mkv", "mp4", "m4v", "mov", "avi", "wmv", "flv", "webm",
+                    "ts", "m2ts", "mpeg", "mpg", "vob", "iso",
+                    "mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "wma",
+                ]
+                let ext = (entry.name as NSString).pathExtension.lowercased()
+                BackendScreens.shell?.offerRemoteOpen(
+                    from: self, fileName: entry.name, url: url,
+                    media: mediaTypes.contains(ext), preview: smallEnough ? preview : nil
+                )
+            } else {
+                preview()
             }
         }
 

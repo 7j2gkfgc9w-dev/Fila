@@ -10,7 +10,7 @@ import Foundation
 /// profile's, so a renamed server or a changed password keeps its bookmarks
 /// and a profile pointed at another address does not — see `WebDAVProfile`.
 @MainActor
-public final class WebDAVBackend: FileBackend {
+public final class WebDAVBackend: RemoteOpenURLProviding {
     /// The bundle the module's strings live in — the framework's when this
     /// is compiled into one, the package's otherwise.
     public nonisolated static var bundle: Bundle {
@@ -65,6 +65,16 @@ public final class WebDAVBackend: FileBackend {
             loadFailure = error
             FilaLog.error("webdav: preferences for \(profile.backendID) unreadable, running on defaults: \(error)")
         }
+    }
+
+    /// A raw WebDAV URL for apps that can authenticate to WebDAV themselves.
+    /// Fila's password is never inserted into the URL.
+    public func remoteOpenURL(for path: ServicePath) -> URL? {
+        guard var address = profile.baseURL else { return nil }
+        for component in path.components {
+            address.appendPathComponent(component, isDirectory: false)
+        }
+        return address
     }
 
     // MARK: - Service

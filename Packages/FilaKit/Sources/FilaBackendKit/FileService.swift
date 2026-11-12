@@ -320,6 +320,14 @@ public protocol FileService: AnyObject, Sendable {
 /// A backend whose root is a filesystem: what the file browser, bookmarks
 /// and transfers work on. Catalogue backends do not conform.
 @MainActor
+/// A remote filesystem that can describe a file by its actual network URL.
+/// The address deliberately excludes usernames/passwords; external apps
+/// authenticate independently and the Fila keychain is never shared.
+@MainActor
+public protocol RemoteOpenURLProviding: FileBackend {
+    func remoteOpenURL(for path: ServicePath) -> URL?
+}
+
 public protocol FileBackend: Backend {
     /// The I/O session for this root. Owns lazy connection and reconnection;
     /// a backend's sidebar data does not require it.

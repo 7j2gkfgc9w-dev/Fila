@@ -36,6 +36,13 @@ jobs:
       - name: Install packaging tools
         run: brew install ldid dpkg
 
+      - name: Apply Fila remote streaming translations
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check Scripts/fila-remote-open-localizations.patch
+          git apply Scripts/fila-remote-open-localizations.patch
+
       - name: Validate source changes
         shell: bash
         run: |

@@ -58,6 +58,14 @@
         )
         /// Neutral, informational card for a remote file or directory.
         func showRemoteInformation(from presenter: UIViewController, title: String, message: String)
+        /// Presents network streaming or a user-requested local preview.
+        func offerRemoteOpen(
+            from presenter: UIViewController,
+            fileName: String,
+            url: URL,
+            media: Bool,
+            preview: (@MainActor () -> Void)?
+        )
         /// The permanent-deletion card, under the destructive accent.
         func confirmPermanentDeletion(
             from presenter: UIViewController,

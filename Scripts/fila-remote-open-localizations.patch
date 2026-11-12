@@ -1,0 +1,667 @@
+diff --git a/Fila/Resources/Localizable.xcstrings b/Fila/Resources/Localizable.xcstrings
+index 66cfd06..8df5683 100644
+--- a/Fila/Resources/Localizable.xcstrings
++++ b/Fila/Resources/Localizable.xcstrings
+@@ -57889,6 +57889,662 @@
+           }
+         }
+       }
++    },
++    "Stream in VLC": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Stream in VLC"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Смотреть в VLC (поток)"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "In VLC streamen"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Reproducir en VLC"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Lire avec VLC en streaming"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Riproduci in streaming con VLC"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Transmitir no VLC"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "البث في VLC"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "VLCでストリーミング"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "VLC에서 스트리밍"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Phát trực tuyến bằng VLC"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 VLC 中流式播放"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 VLC 中串流播放"
++          }
++        }
++      }
++    },
++    "Stream in Infuse": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Stream in Infuse"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Смотреть в Infuse (поток)"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "In Infuse streamen"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Reproducir en Infuse"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Lire avec Infuse en streaming"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Riproduci in streaming con Infuse"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Transmitir no Infuse"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "البث في Infuse"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Infuseでストリーミング"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Infuse에서 스트리밍"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Phát trực tuyến bằng Infuse"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 Infuse 中流式播放"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 Infuse 中串流播放"
++          }
++        }
++      }
++    },
++    "Preview in Fila (download)": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Preview in Fila (download)"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Просмотр в Fila (с загрузкой)"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "In Fila ansehen (Download)"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Vista previa en Fila (descargar)"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Aperçu dans Fila (téléchargement)"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Anteprima in Fila (download)"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Prévia no Fila (baixar)"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "معاينة في Fila (تنزيل)"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Filaでプレビュー（ダウンロード）"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Fila에서 미리보기(다운로드)"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Xem trước trong Fila (tải xuống)"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 Fila 中预览（需下载）"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "在 Fila 中預覽（需下載）"
++          }
++        }
++      }
++    },
++    "Copy Network Link": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Copy Network Link"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Скопировать сетевую ссылку"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Netzwerklink kopieren"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Copiar enlace de red"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Copier le lien réseau"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Copia link di rete"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Copiar link de rede"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "نسخ رابط الشبكة"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ネットワークリンクをコピー"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "네트워크 링크 복사"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Sao chép liên kết mạng"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "复制网络链接"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "複製網路連結"
++          }
++        }
++      }
++    },
++    "Share Network Link": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Share Network Link"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Поделиться сетевой ссылкой"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Netzwerklink teilen"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Compartir enlace de red"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Partager le lien réseau"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Condividi link di rete"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Compartilhar link de rede"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "مشاركة رابط الشبكة"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ネットワークリンクを共有"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "네트워크 링크 공유"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Chia sẻ liên kết mạng"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "分享网络链接"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "分享網路連結"
++          }
++        }
++      }
++    },
++    "The external app streams directly from the server and may request its own login.": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "The external app streams directly from the server and may request its own login."
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Внешнее приложение читает файл напрямую с сервера и может запросить свои данные для входа."
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Die externe App streamt direkt vom Server und fragt möglicherweise nach eigenen Zugangsdaten."
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "La aplicación externa reproduce directamente desde el servidor y puede solicitar sus propias credenciales."
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "L’application externe lit directement depuis le serveur et peut demander une connexion distincte."
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "L’app esterna riproduce direttamente dal server e potrebbe richiedere credenziali proprie."
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "O aplicativo externo transmite diretamente do servidor e pode solicitar suas próprias credenciais."
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "يبث التطبيق الخارجي مباشرة من الخادم وقد يطلب بيانات تسجيل الدخول الخاصة به."
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "外部アプリがサーバーから直接ストリーミングします。別途ログインが必要な場合があります。"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "외부 앱이 서버에서 직접 스트리밍하며 별도 로그인이 필요할 수 있습니다."
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Ứng dụng ngoài phát trực tiếp từ máy chủ và có thể yêu cầu đăng nhập riêng."
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "外部应用直接从服务器流式播放，可能需要单独登录。"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "外部應用程式直接從伺服器串流播放，可能需要另外登入。"
++          }
++        }
++      }
++    },
++    "Player Not Installed": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Player Not Installed"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Плеер не установлен"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Player nicht installiert"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Reproductor no instalado"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Lecteur non installé"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Lettore non installato"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Player não instalado"
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "المشغل غير مثبت"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "プレーヤーが未インストール"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "플레이어가 설치되지 않음"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Chưa cài trình phát"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "未安装播放器"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "尚未安裝播放器"
++          }
++        }
++      }
++    },
++    "Install VLC or Infuse and sign in to this server there.": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Install VLC or Infuse and sign in to this server there."
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Установите VLC или Infuse и войдите в учётную запись сервера в этом приложении."
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Installiere VLC oder Infuse und melde dich dort am Server an."
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Instala VLC o Infuse e inicia sesión en el servidor desde esa aplicación."
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Installez VLC ou Infuse et connectez-vous au serveur depuis cette application."
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Installa VLC o Infuse e accedi al server da quell’app."
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Instale o VLC ou o Infuse e entre no servidor por esse aplicativo."
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ثبّت VLC أو Infuse وسجّل الدخول إلى الخادم من داخل التطبيق."
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "VLCまたはInfuseをインストールし、そのアプリでサーバーにログインしてください。"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "VLC 또는 Infuse를 설치한 다음 해당 앱에서 서버에 로그인하세요."
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Cài VLC hoặc Infuse và đăng nhập vào máy chủ trong ứng dụng đó."
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "请安装 VLC 或 Infuse，并在该应用中登录服务器。"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "請安裝 VLC 或 Infuse，並在該應用程式中登入伺服器。"
++          }
++        }
++      }
+     }
+   },
+   "version" : "1.0"

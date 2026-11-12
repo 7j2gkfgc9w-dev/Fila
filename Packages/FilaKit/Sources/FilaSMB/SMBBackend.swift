@@ -10,7 +10,7 @@ import Foundation
 /// profile's, so a renamed share or a changed password keeps its bookmarks
 /// and a share pointed at another server does not — see `SMBProfile`.
 @MainActor
-public final class SMBBackend: FileBackend {
+public final class SMBBackend: RemoteOpenURLProviding {
     /// The bundle the module's strings live in — the framework's when this
     /// is compiled into one, the package's otherwise.
     public nonisolated static var bundle: Bundle {
@@ -65,6 +65,19 @@ public final class SMBBackend: FileBackend {
     /// The share's own name, for rows and titles that want it.
     public var shareName: String {
         profile.share
+    }
+
+    /// An SMB URL that VLC/Infuse can stream without making a full snapshot.
+    /// Never put the Fila keychain password into a URL or x-callback link.
+    public func remoteOpenURL(for path: ServicePath) -> URL? {
+        var parts = URLComponents()
+        parts.scheme = "smb"
+        parts.host = profile.host
+        if profile.port != SMBProfile.defaultPort {
+            parts.port = profile.port
+        }
+        parts.path = "/" + ([profile.share] + path.components).joined(separator: "/")
+        return parts.url
     }
 
     // MARK: - Service

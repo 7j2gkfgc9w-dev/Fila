@@ -104,6 +104,81 @@ final class AppBackendShell: BackendShell {
         presenter.presentMessage(title, message: message)
     }
 
+    /// Show network-aware actions without staging the full remote file.
+    func offerRemoteOpen(
+        from presenter: UIViewController,
+        fileName: String,
+        url: URL,
+        media: Bool,
+        preview: (@MainActor () -> Void)?
+    ) {
+        let alert = AlertViewController(
+            title: .init(fileName),
+            message: String.LocalizationValue(
+                "The external app streams directly from the server and may request its own login."
+            )
+        ) { context in
+            context.allowSimpleDispose()
+            if media {
+                context.addAction(title: String.LocalizationValue("Stream in VLC")) {
+                    context.dispose { self.launchRemotePlayer("vlc-x-callback", url: url, name: fileName) }
+                }
+                context.addAction(title: String.LocalizationValue("Stream in Infuse")) {
+                    context.dispose { self.launchRemotePlayer("infuse", url: url, name: fileName) }
+                }
+            }
+            if let preview {
+                context.addAction(title: String.LocalizationValue("Preview in Fila (download)")) {
+                    context.dispose { preview() }
+                }
+            }
+            context.addAction(title: String.LocalizationValue("Copy Network Link")) {
+                context.dispose {
+                    UIPasteboard.general.url = url
+                    self.toast(String(localized: "Copied"))
+                }
+            }
+            context.addAction(title: String.LocalizationValue("Share Network Link")) {
+                context.dispose {
+                    let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                    if let popover = sheet.popoverPresentationController {
+                        popover.sourceView = presenter.view
+                        popover.sourceRect = CGRect(
+                            x: presenter.view.bounds.midX, y: presenter.view.bounds.midY,
+                            width: 1, height: 1
+                        )
+                    }
+                    presenter.present(sheet, animated: true)
+                }
+            }
+            context.addAction(title: String.LocalizationValue("Cancel")) { context.dispose() }
+        }
+        presenter.present(alert, animated: true)
+    }
+
+    /// VLC and Infuse both accept an x-callback play/stream network URL.
+    /// URLComponents encodes nested URLs, including non-ASCII path segments.
+    private func launchRemotePlayer(_ scheme: String, url: URL, name: String) {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = "x-callback-url"
+        components.path = scheme == "infuse" ? "/play" : "/stream"
+        components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+        if scheme == "infuse" {
+            components.queryItems?.append(URLQueryItem(name: "filename", value: name))
+        }
+        guard let target = components.url else { return }
+        UIApplication.shared.open(target, options: [:]) { success in
+            guard !success else { return }
+            Task { @MainActor in
+                self.alert(
+                    title: String(localized: "Player Not Installed"),
+                    message: String(localized: "Install VLC or Infuse and sign in to this server there.")
+                )
+            }
+        }
+    }
+
     func confirmPermanentDeletion(
         from presenter: UIViewController,
         title: String,
