@@ -323,7 +323,6 @@ public protocol FileService: AnyObject, Sendable {
 /// A remote filesystem that can describe a file by its actual network URL.
 /// The address deliberately excludes usernames/passwords; external apps
 /// authenticate independently and the Fila keychain is never shared.
-@MainActor
 public protocol RemoteOpenURLProviding: FileBackend {
     func remoteOpenURL(for path: ServicePath) -> URL?
 }
