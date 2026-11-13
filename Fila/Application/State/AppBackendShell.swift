@@ -5,6 +5,7 @@ import FilaClient
 import FilaProtocol
 import UIKit
 import UniformTypeIdentifiers
+import WebKit
 
 /// What module screens borrow from the app: a browser for a location, the
 /// destination pickers, staging and jobs through the one operation centre,
@@ -110,12 +111,16 @@ final class AppBackendShell: BackendShell {
         fileName: String,
         url: URL,
         media: Bool,
-        preview: (@MainActor () -> Void)?
+        fileExtension: String,
+        preview: (@MainActor () -> Void)?,
+        text: (@MainActor () -> Void)?,
+        table: (@MainActor () -> Void)?,
+        openInApps: (@MainActor () -> Void)?
     ) {
         let alert = AlertViewController(
             title: .init(fileName),
             message: String.LocalizationValue(
-                "The external app streams directly from the server and may request its own login."
+                "Choose a viewer. System apps need a temporary local copy; streaming players read from the server."
             )
         ) { context in
             context.allowSimpleDispose()
@@ -127,9 +132,24 @@ final class AppBackendShell: BackendShell {
                     context.dispose { self.launchRemotePlayer("infuse", url: url, name: fileName) }
                 }
             }
+            if let table {
+                context.addAction(title: String.LocalizationValue("View as Table")) {
+                    context.dispose { table() }
+                }
+            }
+            if let text {
+                context.addAction(title: String.LocalizationValue("View as Text / Code")) {
+                    context.dispose { text() }
+                }
+            }
             if let preview {
                 context.addAction(title: String.LocalizationValue("Preview in Fila (download)")) {
                     context.dispose { preview() }
+                }
+            }
+            if let openInApps {
+                context.addAction(title: String.LocalizationValue("Open in Another App (download)")) {
+                    context.dispose { openInApps() }
                 }
             }
             context.addAction(title: String.LocalizationValue("Copy Network Link")) {
@@ -177,6 +197,139 @@ final class AppBackendShell: BackendShell {
                 )
             }
         }
+    }
+
+    /// Preview a small UTF-8 text/code file without installing a text editor.
+    func previewText(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void) {
+        guard let content = Self.readSmallText(file) else {
+            released()
+            alert(title: String(localized: "Could Not Read Text"),
+                  message: String(localized: "This file cannot be displayed as text."))
+            return
+        }
+        let viewer = UIViewController()
+        viewer.title = title
+        let area = UITextView()
+        area.text = content
+        area.isEditable = false
+        area.isSelectable = true
+        area.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        area.backgroundColor = .systemBackground
+        area.textColor = .label
+        viewer.view = area
+        ReleaseOnDeinit.attach(to: viewer, released)
+        if let navigation = presenter.navigationController {
+            navigation.pushViewController(viewer, animated: true)
+        } else {
+            presenter.present(UINavigationController(rootViewController: viewer), animated: true)
+        }
+    }
+
+    /// iPadOS discovers actual installed handlers for a real local file URL.
+    /// The staged file exists only while the system sheet is alive.
+    func openInSystemApps(_ file: URL, from presenter: UIViewController, released: @escaping () -> Void) {
+        let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+        ReleaseOnDeinit.attach(to: sheet, released)
+        presenter.anchor(sheet, to: presenter.view)
+        presenter.present(sheet, animated: true)
+    }
+
+    private static func readSmallText(_ file: URL) -> String? {
+        guard let data = try? Data(contentsOf: file, options: .mappedIfSafe),
+              data.count <= 8 * 1024 * 1024 else { return nil }
+        guard !data.contains(0) else { return nil }
+        return String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .utf16)
+            ?? String(data: data, encoding: .isoLatin1)
+    }
+
+    /// A read-only CSV/TSV table; escaped HTML, no remote scripts or assets.
+    func previewCSVTable(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void) {
+        guard let content = Self.readSmallText(file) else {
+            released()
+            alert(title: String(localized: "Could Not Read Text"),
+                  message: String(localized: "This file cannot be displayed as text."))
+            return
+        }
+        let separator: Character = file.pathExtension.lowercased() == "tsv" ? "\t" : ","
+        let parsed = Self.parseDelimited(content, separator: separator, limit: 1000)
+        let viewer = UIViewController()
+        viewer.title = title
+        let web = WKWebView()
+        viewer.view = web
+        let head = (parsed.rows.first ?? []).map { "<th>" + Self.escapeHTML($0) + "</th>" }.joined()
+        let body = parsed.rows.dropFirst().map { row in
+            "<tr>" + row.map { "<td>" + Self.escapeHTML($0) + "</td>" }.joined() + "</tr>"
+        }.joined()
+        let notice = parsed.truncated
+            ? "<p>" + Self.escapeHTML(String(localized: "Showing the first 1,000 rows.")) + "</p>" : ""
+        let html = """
+        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+        <style>
+        body{font:14px -apple-system,system-ui;margin:12px;color:#111;background:#fff}
+        table{border-collapse:collapse;font-variant-numeric:tabular-nums}
+        td,th{border:1px solid #aaa;padding:6px 9px;text-align:left;overflow-wrap:anywhere}
+        tr:nth-child(even){background:#f3f5f8}th{position:sticky;top:0;background:#dce8fa}
+        @media(prefers-color-scheme:dark){body{background:#111;color:#eee}
+        th{background:#33475e}tr:nth-child(even){background:#222}}
+        </style></head><body>\(notice)<div style="overflow:auto"><table><thead><tr>\(head)</tr></thead>
+        <tbody>\(body)</tbody></table></div></body></html>
+        """
+        web.loadHTMLString(html, baseURL: nil)
+        ReleaseOnDeinit.attach(to: viewer, released)
+        if let navigation = presenter.navigationController {
+            navigation.pushViewController(viewer, animated: true)
+        } else {
+            presenter.present(UINavigationController(rootViewController: viewer), animated: true)
+        }
+    }
+
+    private static func parseDelimited(_ text: String, separator: Character, limit: Int)
+        -> (rows: [[String]], truncated: Bool)
+    {
+        var rows: [[String]] = []
+        var row: [String] = []
+        var field = ""
+        var quoted = false
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count && rows.count < limit {
+            let c = chars[i]
+            if c == "\"" {
+                if quoted && i + 1 < chars.count && chars[i + 1] == "\"" {
+                    if field.count < 2000 { field.append("\"") }
+                    i += 1
+                } else {
+                    quoted.toggle()
+                }
+            } else if !quoted && c == separator {
+                row.append(field)
+                field = ""
+            } else if !quoted && (c == "\r" || c == "\n") {
+                row.append(field)
+                rows.append(row)
+                row = []
+                field = ""
+                if c == "\r" && i + 1 < chars.count && chars[i + 1] == "\n" { i += 1 }
+            } else if field.count < 2000 {
+                field.append(c)
+            }
+            i += 1
+        }
+        if rows.count < limit && (!row.isEmpty || !field.isEmpty) {
+            row.append(field)
+            rows.append(row)
+        }
+        return (rows, i < chars.count)
+    }
+
+    private static func escapeHTML(_ value: String) -> String {
+        value.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 
     func confirmPermanentDeletion(

@@ -294,15 +294,49 @@
             if let network = backend as? any RemoteOpenURLProviding,
                let url = network.remoteOpenURL(for: child) {
                 let smallEnough = entry.size.map { $0 <= Self.previewSizeLimit } == true
+                // Preview text and CSV through separate bounded local viewers.
+                // Arbitrary-size/unknown-size items are never staged by default.
+                let textEnough = entry.size.map { $0 <= 8 * 1024 * 1024 } == true
                 let mediaTypes: Set<String> = [
                     "mkv", "mp4", "m4v", "mov", "avi", "wmv", "flv", "webm",
                     "ts", "m2ts", "mpeg", "mpg", "vob", "iso",
                     "mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "wma",
                 ]
+                let textTypes: Set<String> = [
+                    "csv", "tsv", "txt", "log", "md", "markdown", "json", "xml",
+                    "yaml", "yml", "ini", "conf", "cfg", "swift", "py", "js",
+                    "ts", "html", "css", "sh", "sql", "toml", "bat", "c", "h",
+                    "cpp", "hpp", "java", "kt", "go", "rs", "rb", "php",
+                ]
                 let ext = (entry.name as NSString).pathExtension.lowercased()
+                let textPreview: @MainActor () -> Void = { [weak self] in
+                    guard let self else { return }
+                    self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                        guard let self else { release(); return }
+                        BackendScreens.shell?.previewText(file, title: entry.name, from: self, released: release)
+                    }
+                }
+                let tablePreview: @MainActor () -> Void = { [weak self] in
+                    guard let self else { return }
+                    self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                        guard let self else { release(); return }
+                        BackendScreens.shell?.previewCSVTable(file, title: entry.name, from: self, released: release)
+                    }
+                }
+                let openInApps: @MainActor () -> Void = { [weak self] in
+                    guard let self else { return }
+                    self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                        guard let self else { release(); return }
+                        BackendScreens.shell?.openInSystemApps(file, from: self, released: release)
+                    }
+                }
                 BackendScreens.shell?.offerRemoteOpen(
                     from: self, fileName: entry.name, url: url,
-                    media: mediaTypes.contains(ext), preview: smallEnough ? preview : nil
+                    media: mediaTypes.contains(ext), fileExtension: ext,
+                    preview: smallEnough ? preview : nil,
+                    text: textEnough && textTypes.contains(ext) ? textPreview : nil,
+                    table: textEnough && (ext == "csv" || ext == "tsv") ? tablePreview : nil,
+                    openInApps: smallEnough ? openInApps : nil
                 )
             } else {
                 preview()

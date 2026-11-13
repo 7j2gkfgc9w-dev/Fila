@@ -1,8 +1,8 @@
 diff --git a/Fila/Resources/Localizable.xcstrings b/Fila/Resources/Localizable.xcstrings
-index 66cfd06..8df5683 100644
+index 66cfd06..a2b35ab 100644
 --- a/Fila/Resources/Localizable.xcstrings
 +++ b/Fila/Resources/Localizable.xcstrings
-@@ -57889,6 +57889,662 @@
+@@ -57889,6 +57889,774 @@
            }
          }
        }
@@ -659,6 +659,118 @@ index 66cfd06..8df5683 100644
 +          "stringUnit": {
 +            "state": "translated",
 +            "value": "請安裝 VLC 或 Infuse，並在該應用程式中登入伺服器。"
++          }
++        }
++      }
++    },
++    "View as Table": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Просмотр таблицы"
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "View as Table"
++          }
++        }
++      }
++    },
++    "View as Text / Code": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Просмотр текста / кода"
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "View as Text / Code"
++          }
++        }
++      }
++    },
++    "Open in Another App (download)": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Открыть в другом приложении (с загрузкой)"
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Open in Another App (download)"
++          }
++        }
++      }
++    },
++    "Choose a viewer. System apps need a temporary local copy; streaming players read from the server.": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Выберите просмотрщик. Системным приложениям потребуется временная копия, а плееры читают файл напрямую с сервера."
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Choose a viewer. System apps need a temporary local copy; streaming players read from the server."
++          }
++        }
++      }
++    },
++    "Could Not Read Text": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Не удалось прочитать текст"
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Could Not Read Text"
++          }
++        }
++      }
++    },
++    "This file cannot be displayed as text.": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Файл нельзя отобразить как текст."
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "This file cannot be displayed as text."
++          }
++        }
++      }
++    },
++    "Showing the first 1,000 rows.": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Показаны первые 1000 строк."
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Showing the first 1,000 rows."
 +          }
 +        }
 +      }
