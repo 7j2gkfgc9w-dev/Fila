@@ -1,8 +1,8 @@
 diff --git a/Fila/Resources/Localizable.xcstrings b/Fila/Resources/Localizable.xcstrings
-index 66cfd06..a2b35ab 100644
+index 66cfd06..223c6ab 100644
 --- a/Fila/Resources/Localizable.xcstrings
 +++ b/Fila/Resources/Localizable.xcstrings
-@@ -57889,6 +57889,774 @@
+@@ -57889,6 +57889,692 @@
            }
          }
        }
@@ -413,88 +413,6 @@ index 66cfd06..a2b35ab 100644
 +          "stringUnit": {
 +            "state": "translated",
 +            "value": "分享網路連結"
-+          }
-+        }
-+      }
-+    },
-+    "The external app streams directly from the server and may request its own login.": {
-+      "localizations": {
-+        "en": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "The external app streams directly from the server and may request its own login."
-+          }
-+        },
-+        "ru": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "Внешнее приложение читает файл напрямую с сервера и может запросить свои данные для входа."
-+          }
-+        },
-+        "de": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "Die externe App streamt direkt vom Server und fragt möglicherweise nach eigenen Zugangsdaten."
-+          }
-+        },
-+        "es": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "La aplicación externa reproduce directamente desde el servidor y puede solicitar sus propias credenciales."
-+          }
-+        },
-+        "fr": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "L’application externe lit directement depuis le serveur et peut demander une connexion distincte."
-+          }
-+        },
-+        "it": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "L’app esterna riproduce direttamente dal server e potrebbe richiedere credenziali proprie."
-+          }
-+        },
-+        "pt-BR": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "O aplicativo externo transmite diretamente do servidor e pode solicitar suas próprias credenciais."
-+          }
-+        },
-+        "ar": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "يبث التطبيق الخارجي مباشرة من الخادم وقد يطلب بيانات تسجيل الدخول الخاصة به."
-+          }
-+        },
-+        "ja": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "外部アプリがサーバーから直接ストリーミングします。別途ログインが必要な場合があります。"
-+          }
-+        },
-+        "ko": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "외부 앱이 서버에서 직접 스트리밍하며 별도 로그인이 필요할 수 있습니다."
-+          }
-+        },
-+        "vi": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "Ứng dụng ngoài phát trực tiếp từ máy chủ và có thể yêu cầu đăng nhập riêng."
-+          }
-+        },
-+        "zh-Hans": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "外部应用直接从服务器流式播放，可能需要单独登录。"
-+          }
-+        },
-+        "zh-Hant": {
-+          "stringUnit": {
-+            "state": "translated",
-+            "value": "外部應用程式直接從伺服器串流播放，可能需要另外登入。"
 +          }
 +        }
 +      }
