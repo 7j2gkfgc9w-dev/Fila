@@ -744,7 +744,7 @@ extension SidebarViewController: UICollectionViewDropDelegate {
                 }
             }
             if invalid > 0 {
-                Toast.show(String(localized: "Could Not Save Favorite"))
+                Toast.show(String(localized: "Unable to Save"))
             }
         }
     }
