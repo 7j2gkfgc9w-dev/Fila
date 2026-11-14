@@ -12,6 +12,7 @@ on:
       - "Packages/FilaKit/Sources/FilaSMB/**"
       - "Packages/FilaKit/Sources/FilaWebDAV/**"
       - "Fila/Application/**"
+      - "Fila/Interface/**"
       - "Fila/Resources/**"
       - "Scripts/fila-remote-open-localizations.patch"
       - "Configuration/**"
