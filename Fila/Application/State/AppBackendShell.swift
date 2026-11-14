@@ -129,8 +129,13 @@ final class AppBackendShell: BackendShell {
                 context.addAction(title: String.LocalizationValue("Stream in VLC")) {
                     context.dispose { self.launchRemotePlayer("vlc-x-callback", url: url, name: fileName) }
                 }
-                context.addAction(title: String.LocalizationValue("Stream in Infuse")) {
-                    context.dispose { self.launchRemotePlayer("infuse", url: url, name: fileName) }
+                // Infuse's x-callback player accepts HTTP(S) links, not SMB
+                // share paths. Offering it for smb:// silently hands Infuse
+                // an unplayable link, regardless of UTF-8 escaping.
+                if url.scheme?.lowercased() == "http" || url.scheme?.lowercased() == "https" {
+                    context.addAction(title: String.LocalizationValue("Stream in Infuse")) {
+                        context.dispose { self.launchRemotePlayer("infuse", url: url, name: fileName) }
+                    }
                 }
             }
             if let table {
@@ -182,18 +187,32 @@ final class AppBackendShell: BackendShell {
         presenter.present(alert, animated: true)
     }
 
-    /// VLC and Infuse both accept an x-callback play/stream network URL.
-    /// URLComponents encodes nested URLs, including non-ASCII path segments.
+    /// Preserve the percent-encoded UTF-8 file path exactly once for VLC.
+    /// The VLC x-callback query re-escapes %D0 as %25D0, which VLC iOS
+    /// historically mishandles for Cyrillic, spaces, or percent in filenames.
+    /// The direct vlc://URL form avoids the extra decoding boundary.
+    /// Plain ASCII HTTP URLs keep the existing x-callback behavior.
+    /// Infuse x-callback is only offered for HTTP(S), not SMB.
     private func launchRemotePlayer(_ scheme: String, url: URL, name: String) {
-        var components = URLComponents()
-        components.scheme = scheme
-        components.host = "x-callback-url"
-        components.path = scheme == "infuse" ? "/play" : "/stream"
-        components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
-        if scheme == "infuse" {
-            components.queryItems?.append(URLQueryItem(name: "filename", value: name))
+        let isVLC = scheme == "vlc-x-callback"
+        let directVLC = isVLC && (
+            url.scheme?.lowercased() == "smb" || url.absoluteString.contains("%")
+        )
+        let target: URL?
+        if directVLC {
+            target = URL(string: "vlc://" + url.absoluteString)
+        } else {
+            var components = URLComponents()
+            components.scheme = scheme
+            components.host = "x-callback-url"
+            components.path = scheme == "infuse" ? "/play" : "/stream"
+            components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+            if scheme == "infuse" {
+                components.queryItems?.append(URLQueryItem(name: "filename", value: name))
+            }
+            target = components.url
         }
-        guard let target = components.url else { return }
+        guard let target else { return }
         UIApplication.shared.open(target, options: [:]) { success in
             guard !success else { return }
             Task { @MainActor in

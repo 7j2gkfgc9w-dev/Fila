@@ -29,6 +29,7 @@ final class SidebarViewController: UIViewController {
         case header(Section)
         case place(SidebarPlace)
         case favorite(String)
+        case remoteFavorite(FileLocation)
         case catalog(BackendID)
         case recent(String)
         case mount(String)
@@ -166,6 +167,9 @@ final class SidebarViewController: UIViewController {
             collectionViewLayout: layout,
         )
         collectionView.delegate = self
+        // Fila folders drag here as shortcuts. The drop never moves or copies
+        // file contents and cannot import foreign app-provided data.
+        collectionView.dropDelegate = self
         view.addSubview(collectionView)
         collectionView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -312,6 +316,7 @@ final class SidebarViewController: UIViewController {
     private func configure(_ cell: IconRowCell, for item: Item) {
         var name: String
         var image: UIImage?
+        var detail: String?
         var color: UIColor = .label
         switch item {
         case .header: return
@@ -326,6 +331,11 @@ final class SidebarViewController: UIViewController {
                 name = displayName
                 color = .systemBrown
             }
+        case let .remoteFavorite(location):
+            let root = BackendComposition.registry.backend(location.backend)?.root
+            name = location.path.name ?? root?.displayName ?? String(localized: "Root")
+            image = FilePresentation.image(kind: .directory, name: name)
+            detail = root?.displayName
         case let .mount(path):
             guard let mount = mounts.first(where: { $0.path == path }) else { return }
             name = path == "/" ? String(localized: "Root") : (path as NSString).lastPathComponent
@@ -339,9 +349,12 @@ final class SidebarViewController: UIViewController {
             name = root.displayName
             image = SidebarLocation.image(for: root)
         }
-        cell.configure(name: name, image: image, nameColor: color, tintColor: .tintColor)
-        if case .favorite = item {
+        cell.configure(name: name, detail: detail, image: image, nameColor: color, tintColor: .tintColor)
+        switch item {
+        case .favorite, .remoteFavorite:
             cell.showFavoriteBadge()
+        default:
+            break
         }
         // A mount is read-only or not; the row says so with a lock on its
         // picture, and VoiceOver says it in words, because a mark is not read.
@@ -369,6 +382,18 @@ final class SidebarViewController: UIViewController {
         SidebarLocation.servers.map { Item.connection($0.location.backend) }
     }
 
+    /// Each SMB/WebDAV backend already persists its own favorites. The sidebar
+    /// only merges its published rows; it never stores a second, stale copy.
+    private var remoteFavorites: [FileLocation] {
+        BackendComposition.sidebar.order
+            .filter { $0 != session.local.id }
+            .flatMap { id in
+                BackendComposition.sidebar.contribution(of: id).favorites.compactMap { row in
+                    row.path.map { FileLocation(backend: id, path: $0) }
+                }
+            }
+    }
+
     @objc private func rebuild() {
         let generation = UUID()
         rebuildGeneration = generation
@@ -393,10 +418,12 @@ final class SidebarViewController: UIViewController {
         let sections: [(Section, [Item])] = [
             (.places, presets),
             (.connections, connections),
-            (.favorites, favorites.filter { recentItems[$0]?.isDirectory == true }.map(Item.favorite)),
+            (.favorites,
+             favorites.filter { recentItems[$0]?.isDirectory != false }.map(Item.favorite)
+                 + remoteFavorites.map(Item.remoteFavorite)),
             (.mounts, mounts.map { Item.mount($0.path) }),
             (.recents, recents.filter { recentItems[$0]?.isDirectory == true }.map(Item.recent)),
-        ].filter { !$0.1.isEmpty }
+        ].filter { $0.0 == .favorites || !$0.1.isEmpty }
         let previous = dataSource.snapshot()
         let collapsed = Set(previous.sectionIdentifiers.filter { section in
             let outline = dataSource.snapshot(for: section)
@@ -563,6 +590,21 @@ final class SidebarViewController: UIViewController {
                 done(true)
             }
             return UISwipeActionsConfiguration(actions: [remove])
+        case let .remoteFavorite(location):
+            let remove = UIContextualAction(style: .destructive, title: String(localized: "Remove")) { _, _, done in
+                guard let backend = BackendComposition.registry.backend(location.backend) as? any FileBackend else {
+                    done(false)
+                    return
+                }
+                do {
+                    try backend.setFavorite(location.path, included: false)
+                    done(true)
+                } catch {
+                    Toast.show(error.localizedDescription)
+                    done(false)
+                }
+            }
+            return UISwipeActionsConfiguration(actions: [remove])
         default:
             return nil
         }
@@ -586,6 +628,10 @@ extension SidebarViewController: UICollectionViewDelegate {
             open(place.path)
         case let .favorite(path), let .mount(path):
             open(path)
+        case let .remoteFavorite(location):
+            let destination = BackendLocation(backend: location.backend, item: location.path.description)
+            guard let screen = SidebarLocation.screen(for: destination) else { return }
+            shell?.replace(screen)
         case let .recent(path):
             openRecent(path)
         case let .catalog(id), let .connection(id):
@@ -605,6 +651,98 @@ extension SidebarViewController: UICollectionViewDelegate {
             await FileSession.shared.ready()
             guard !Task.isCancelled else { return }
             self?.shell?.open(path)
+        }
+    }
+}
+
+// MARK: - Drag folders into Favorites
+
+extension SidebarViewController: UICollectionViewDropDelegate {
+    private func isFavoritesTarget(at indexPath: IndexPath?) -> Bool {
+        guard let indexPath, let item = dataSource.itemIdentifier(for: indexPath) else { return false }
+        switch item {
+        case .header(.favorites), .favorite, .remoteFavorite:
+            return true
+        default:
+            return false
+        }
+    }
+
+    func collectionView(
+        _: UICollectionView,
+        dropSessionDidUpdate session: UIDropSession,
+        withDestinationIndexPath indexPath: IndexPath?
+    ) -> UICollectionViewDropProposal {
+        guard isFavoritesTarget(at: indexPath),
+              !FileReference.dragged(session.items).isEmpty,
+              FileReference.dragged(session.items).count == session.items.count else {
+            return UICollectionViewDropProposal(operation: .forbidden)
+        }
+        return UICollectionViewDropProposal(operation: .copy, intent: .insertIntoDestinationIndexPath)
+    }
+
+    func collectionView(_: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
+        guard isFavoritesTarget(at: coordinator.destinationIndexPath) else { return }
+        let folders = FileReference.dragged(coordinator.items.map(\.dragItem))
+        guard !folders.isEmpty, folders.count == coordinator.items.count else { return }
+        // Do not let a pin drop copy/move a directory or read its contents.
+        Task { [weak self, session] in
+            guard let self else { return }
+            var added = 0
+            var invalid = 0
+            for item in folders {
+                guard !Task.isCancelled else { return }
+                switch item {
+                case let .local(path):
+                    guard session.local.servicePath(forAbsolute: path) != nil,
+                          let details = try? await session.perform(
+                              retryOnDisconnect: true, { try await $0.details(of: path) }
+                          ), details.node.isNavigable else {
+                        invalid += 1
+                        continue
+                    }
+                    if !session.isFavorite(path) {
+                        session.toggleFavorite(path)
+                        added += 1
+                    }
+                case let .remote(location):
+                    guard let backend = BackendComposition.registry.backend(location.backend) as? any FileBackend else {
+                        invalid += 1
+                        continue
+                    }
+                    do {
+                        let service = try await backend.fileService()
+                        let details = try await service.details(location.path)
+                        guard details.entersDirectory else {
+                            invalid += 1
+                            continue
+                        }
+                        // A favorite belongs to this exact backend, not to a
+                        // hostname or an unrelated share with the same folder name.
+                        let existing = BackendComposition.sidebar.contribution(of: location.backend).favorites
+                            .contains { $0.path == location.path }
+                        if !existing {
+                            try backend.setFavorite(location.path, included: true)
+                            added += 1
+                        }
+                    } catch {
+                        invalid += 1
+                    }
+                }
+            }
+            if added > 0 {
+                // Expand the Favorites section if it was previously collapsed.
+                var outline = dataSource.snapshot(for: .favorites)
+                let header = Item.header(.favorites)
+                if outline.items.contains(header), !outline.isExpanded(header) {
+                    outline.expand([header])
+                    dataSource.apply(outline, to: .favorites, animatingDifferences: true)
+                }
+                rebuild()
+            }
+            if invalid > 0 {
+                Toast.show(String(localized: "Could Not Save Favorite"))
+            }
         }
     }
 }
