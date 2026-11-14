@@ -71,12 +71,12 @@
                 guard let self else { return }
                 BackendScreens.shell?.presentTwoPanes(
                     left: FileLocation(backend: backend.id, path: path), from: self
-                ).then {
+                )
+            }
+        ).then {
             $0.accessibilityLabel = "Two Panes"
             $0.title = "Two Panes"
         }
-            }
-        )
 
         @objc private func clipboardChanged() {
             trailingNavigationItems = barItems
@@ -406,10 +406,16 @@
                         BackendScreens.shell?.previewCSVTable(file, title: entry.name, from: self, released: release)
                     }
                 }
-                let editor: (@MainActor () -> Void)? =
-                    textEnough && textTypes.contains(ext) && entry.kind == .file
-                    && entry.size.map { $0 <= RemoteTextEditorViewController.maximumBytes } == true
-                    ? { [weak self] in self?.editRemoteText(entry) } : nil
+                let editor: (@MainActor () -> Void)?
+                if textEnough && textTypes.contains(ext) && entry.kind == .file,
+                   let size = entry.size, size <= RemoteTextEditorViewController.maximumBytes {
+                    editor = { [weak self] in
+                        guard let self else { return }
+                        self.editRemoteText(entry)
+                    }
+                } else {
+                    editor = nil
+                }
                 let openInApps: @MainActor () -> Void = { [weak self] in
                     guard let self else { return }
                     self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
