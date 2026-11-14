@@ -4,6 +4,7 @@ import FilaBackendUI
 import FilaClient
 import FilaProtocol
 import UIKit
+import SnapKit
 import UniformTypeIdentifiers
 import WebKit
 
@@ -654,22 +655,23 @@ private final class DualPaneFileManagerViewController: UIViewController {
         folderPair.distribution = .fill
         folderPair.spacing = 0
         divider.backgroundColor = .separator
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        divider.widthAnchor.constraint(equalToConstant: 1).isActive = true
+        divider.snp.makeConstraints { make in
+            make.width.equalTo(1)
+        }
 
         let container = UIStackView(arrangedSubviews: [tip, folderPair])
         container.axis = .vertical
         container.spacing = 7
         view.addSubview(container)
-        container.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-            leftNavigation.view.widthAnchor.constraint(equalTo: rightNavigation.view.widthAnchor),
-            tip.heightAnchor.constraint(greaterThanOrEqualToConstant: 22),
-        ])
+        container.snp.makeConstraints { make in
+            make.edges.equalTo(view.safeAreaLayoutGuide)
+        }
+        leftNavigation.view.snp.makeConstraints { make in
+            make.width.equalTo(rightNavigation.view.snp.width)
+        }
+        tip.snp.makeConstraints { make in
+            make.height.greaterThanOrEqualTo(22)
+        }
 
         leftNavigation.didMove(toParent: self)
         rightNavigation.didMove(toParent: self)

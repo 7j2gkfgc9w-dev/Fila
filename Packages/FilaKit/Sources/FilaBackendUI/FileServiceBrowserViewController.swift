@@ -3,6 +3,7 @@
     import FilaBackendKit
     import Then
     import UIKit
+    import SnapKit
 
     /// A directory on a remote file backend, over the neutral file contract.
     ///
@@ -1040,13 +1041,10 @@ private final class RemoteFileSearchViewController: UIViewController, UISearchBa
         stack.axis = .vertical
         stack.spacing = 8
         view.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
-        ])
+        stack.snp.makeConstraints { make in
+            make.top.bottom.equalTo(view.safeAreaLayoutGuide)
+            make.leading.trailing.equalTo(view.safeAreaLayoutGuide).inset(8)
+        }
 
         let sizeMenu = UIMenu(title: String(localized: "Size", bundle: .module), children: [
             UIAction(title: String(localized: "Any Size", bundle: .module)) { [weak self] _ in
@@ -1221,13 +1219,9 @@ private final class RemoteTextEditorViewController: UIViewController {
         editor.autocapitalizationType = .none
         editor.alwaysBounceVertical = true
         view.addSubview(editor)
-        editor.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            editor.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            editor.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            editor.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
-            editor.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-        ])
+        editor.snp.makeConstraints { make in
+            make.edges.equalTo(view.safeAreaLayoutGuide)
+        }
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             systemItem: .cancel,
             primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
