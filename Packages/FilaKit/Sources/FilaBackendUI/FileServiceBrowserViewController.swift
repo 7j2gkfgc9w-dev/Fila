@@ -316,6 +316,13 @@
                         BackendScreens.shell?.previewText(file, title: entry.name, from: self, released: release)
                     }
                 }
+                let codePreview: @MainActor () -> Void = { [weak self] in
+                    guard let self else { return }
+                    self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                        guard let self else { release(); return }
+                        BackendScreens.shell?.previewCode(file, title: entry.name, from: self, released: release)
+                    }
+                }
                 let tablePreview: @MainActor () -> Void = { [weak self] in
                     guard let self else { return }
                     self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
@@ -335,6 +342,7 @@
                     media: mediaTypes.contains(ext), fileExtension: ext,
                     preview: smallEnough ? preview : nil,
                     text: textEnough && textTypes.contains(ext) ? textPreview : nil,
+                    code: textEnough && textTypes.contains(ext) ? codePreview : nil,
                     table: textEnough && (ext == "csv" || ext == "tsv") ? tablePreview : nil,
                     openInApps: smallEnough ? openInApps : nil
                 )

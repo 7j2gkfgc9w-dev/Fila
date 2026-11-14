@@ -114,6 +114,7 @@ final class AppBackendShell: BackendShell {
         fileExtension: String,
         preview: (@MainActor () -> Void)?,
         text: (@MainActor () -> Void)?,
+        code: (@MainActor () -> Void)?,
         table: (@MainActor () -> Void)?,
         openInApps: (@MainActor () -> Void)?
     ) {
@@ -138,8 +139,13 @@ final class AppBackendShell: BackendShell {
                 }
             }
             if let text {
-                context.addAction(title: String.LocalizationValue("View as Text / Code")) {
+                context.addAction(title: String.LocalizationValue("View as Text")) {
                     context.dispose { text() }
+                }
+            }
+            if let code {
+                context.addAction(title: String.LocalizationValue("View as Code")) {
+                    context.dispose { code() }
                 }
             }
             if let preview {
@@ -214,6 +220,43 @@ final class AppBackendShell: BackendShell {
         area.isEditable = false
         area.isSelectable = true
         area.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        area.backgroundColor = .systemBackground
+        area.textColor = .label
+        viewer.view = area
+        ReleaseOnDeinit.attach(to: viewer, released)
+        if let navigation = presenter.navigationController {
+            navigation.pushViewController(viewer, animated: true)
+        } else {
+            presenter.present(UINavigationController(rootViewController: viewer), animated: true)
+        }
+    }
+
+    /// Code-mode preview shows read-only text with line numbers; it never writes back to SMB/WebDAV.
+    func previewCode(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void) {
+        guard let content = Self.readSmallText(file) else {
+            released()
+            alert(title: String(localized: "Could Not Read Text"),
+                  message: String(localized: "This file cannot be displayed as text."))
+            return
+        }
+        let viewer = UIViewController()
+        viewer.title = title
+        let area = UITextView()
+        var numbered = ""
+        numbered.reserveCapacity(min(content.utf8.count + 400_000, 10_000_000))
+        var lineNumber = 0
+        content.enumerateLines { line, stop in
+            lineNumber += 1
+            numbered.append("\(lineNumber) │ \(line)\n")
+            if lineNumber >= 20_000 {
+                numbered.append("…\n")
+                stop = true
+            }
+        }
+        area.text = numbered
+        area.isEditable = false
+        area.isSelectable = true
+        area.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         area.backgroundColor = .systemBackground
         area.textColor = .label
         viewer.view = area

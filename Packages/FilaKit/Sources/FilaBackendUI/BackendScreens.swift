@@ -67,11 +67,13 @@
             fileExtension: String,
             preview: (@MainActor () -> Void)?,
             text: (@MainActor () -> Void)?,
+            code: (@MainActor () -> Void)?,
             table: (@MainActor () -> Void)?,
             openInApps: (@MainActor () -> Void)?
         )
         /// Local snapshots are temporary; these viewers retain and release them.
         func previewText(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void)
+        func previewCode(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void)
         func previewCSVTable(_ file: URL, title: String, from presenter: UIViewController, released: @escaping () -> Void)
         func openInSystemApps(_ file: URL, from presenter: UIViewController, released: @escaping () -> Void)
         /// The permanent-deletion card, under the destructive accent.

@@ -2,7 +2,7 @@ diff --git a/Fila/Resources/Localizable.xcstrings b/Fila/Resources/Localizable.x
 index 66cfd06..223c6ab 100644
 --- a/Fila/Resources/Localizable.xcstrings
 +++ b/Fila/Resources/Localizable.xcstrings
-@@ -57889,6 +57889,692 @@
+@@ -57889,6 +57889,708 @@
            }
          }
        }
@@ -597,18 +597,34 @@ index 66cfd06..223c6ab 100644
 +        }
 +      }
 +    },
-+    "View as Text / Code": {
++    "View as Text": {
 +      "localizations": {
 +        "ru": {
 +          "stringUnit": {
 +            "state": "translated",
-+            "value": "Просмотр текста / кода"
++            "value": "Просмотр текста"
 +          }
 +        },
 +        "en": {
 +          "stringUnit": {
 +            "state": "translated",
-+            "value": "View as Text / Code"
++            "value": "View as Text"
++          }
++        }
++      }
++    },
++    "View as Code": {
++      "localizations": {
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Просмотр кода"
++          }
++        },
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "View as Code"
 +          }
 +        }
 +      }
