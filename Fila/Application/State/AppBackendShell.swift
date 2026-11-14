@@ -187,20 +187,32 @@ final class AppBackendShell: BackendShell {
         presenter.present(alert, animated: true)
     }
 
-    /// VLC interprets vlc://<nested SMB URL> as invalid http://smb://...
-    /// Use VLC's supported x-callback stream action instead.
-    /// The original smb:// URL goes into the outer query as a value.
-    /// URLComponents escapes the nested URL for that query; after one
-    /// query-decoding step VLC receives the unmodified UTF-8 SMB path.
-    /// Infuse x-callback is only offered for HTTP(S), not SMB.
+    /// VLC iOS URLHandler.getURLForValue decodes an outer x-callback parameter
+    /// ONLY if its first bytes contain the fully encoded "://": "%3A%2F%2F".
+    /// URLComponents.queryItems leaves scheme separators unescaped while
+    /// escaping existing "%D0" in Cyrillic SMB paths to "%25D0", so VLC
+    /// interprets the latter literally and requests a non-existent filename.
+    /// Encode the entire nested URL (including its scheme) as RFC3986
+    /// unreserved characters; VLC removes this outer encoding precisely once.
+    /// Do not change Infuse's existing HTTP(S) query behavior.
     private func launchRemotePlayer(_ scheme: String, url: URL, name: String) {
         var components = URLComponents()
         components.scheme = scheme
         components.host = "x-callback-url"
         components.path = scheme == "infuse" ? "/play" : "/stream"
-        components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
-        if scheme == "infuse" {
-            components.queryItems?.append(URLQueryItem(name: "filename", value: name))
+        if scheme == "vlc-x-callback" {
+            let unreserved = CharacterSet(
+                charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+            )
+            guard let fullyEncodedURL = url.absoluteString.addingPercentEncoding(
+                withAllowedCharacters: unreserved
+            ) else { return }
+            components.percentEncodedQuery = "url=" + fullyEncodedURL
+        } else {
+            components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+            if scheme == "infuse" {
+                components.queryItems?.append(URLQueryItem(name: "filename", value: name))
+            }
         }
         guard let target = components.url else { return }
         UIApplication.shared.open(target, options: [:]) { success in
