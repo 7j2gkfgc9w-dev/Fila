@@ -555,7 +555,7 @@ final class SidebarViewController: UIViewController {
                     self.shell?.open(parent, select: (path as NSString).lastPathComponent)
                 }
             } catch {
-                self?.report(error)
+                Toast.show(error.localizedDescription)
             }
         }
     }
@@ -667,7 +667,7 @@ extension SidebarViewController: UICollectionViewDelegate {
                         self.shell?.replace(screen)
                     }
                 } catch {
-                    self?.report(error)
+                    Toast.show(error.localizedDescription)
                 }
             }
         case let .recent(path):
