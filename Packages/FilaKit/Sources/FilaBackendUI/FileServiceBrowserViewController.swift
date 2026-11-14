@@ -183,7 +183,7 @@
             }
             let recent: [UIMenuElement] = history.recent.map { location in
                 UIAction(
-                    title: (location.path.name ?? String(localized: "Root", bundle: bundle))
+                    title: (location.path.name ?? location.backend.rawValue)
                         + " · " + location.backend.rawValue,
                     image: UIImage(systemName: "clock"),
                 ) { _ in
