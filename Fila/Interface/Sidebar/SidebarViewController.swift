@@ -736,9 +736,12 @@ extension SidebarViewController: UICollectionViewDropDelegate {
                 let header = Item.header(.favorites)
                 if outline.items.contains(header), !outline.isExpanded(header) {
                     outline.expand([header])
-                    dataSource.apply(outline, to: .favorites, animatingDifferences: true)
+                    dataSource.apply(outline, to: .favorites, animatingDifferences: true) { [weak self] in
+                        self?.rebuild()
+                    }
+                } else {
+                    rebuild()
                 }
-                rebuild()
             }
             if invalid > 0 {
                 Toast.show(String(localized: "Could Not Save Favorite"))
