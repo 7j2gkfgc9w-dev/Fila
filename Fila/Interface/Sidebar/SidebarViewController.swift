@@ -419,8 +419,7 @@ final class SidebarViewController: UIViewController {
             (.places, presets),
             (.connections, connections),
             (.favorites,
-             favorites.filter { recentItems[$0]?.isDirectory != false }.map(Item.favorite)
-                 + remoteFavorites.map(Item.remoteFavorite)),
+             favorites.map(Item.favorite) + remoteFavorites.map(Item.remoteFavorite)),
             (.mounts, mounts.map { Item.mount($0.path) }),
             (.recents, recents.filter { recentItems[$0]?.isDirectory == true }.map(Item.recent)),
         ].filter { $0.0 == .favorites || !$0.1.isEmpty }
@@ -542,6 +541,25 @@ final class SidebarViewController: UIViewController {
         }
     }
 
+    private func openFavorite(_ path: String) {
+        openTask = Task { [weak self, session] in
+            do {
+                let details = try await session.perform(retryOnDisconnect: true) {
+                    try await $0.details(of: path)
+                }
+                guard let self, !Task.isCancelled else { return }
+                if details.node.isNavigable {
+                    self.shell?.open(path)
+                } else {
+                    let parent = (path as NSString).deletingLastPathComponent
+                    self.shell?.open(parent, select: (path as NSString).lastPathComponent)
+                }
+            } catch {
+                self?.report(error)
+            }
+        }
+    }
+
     private func openRecent(_ path: String) {
         openTask = Task { [weak self, session] in
             do {
@@ -626,12 +644,32 @@ extension SidebarViewController: UICollectionViewDelegate {
             break
         case let .place(place):
             open(place.path)
-        case let .favorite(path), let .mount(path):
+        case let .favorite(path):
+            openFavorite(path)
+        case let .mount(path):
             open(path)
         case let .remoteFavorite(location):
-            let destination = BackendLocation(backend: location.backend, item: location.path.description)
-            guard let screen = SidebarLocation.screen(for: destination) else { return }
-            shell?.replace(screen)
+            // A bookmark can point at either a folder or a file. Inspect the
+            // real remote entry; do not treat a file as a directory.
+            openTask = Task { [weak self] in
+                guard let backend = BackendComposition.fileBackends.first(
+                    where: { $0.id == location.backend }
+                ) else { return }
+                do {
+                    let service = try await backend.fileService()
+                    let entry = try await service.details(location.path)
+                    guard let self, !Task.isCancelled else { return }
+                    if entry.entersDirectory {
+                        self.shell?.replace(FileServiceBrowserViewController(backend: backend, path: location.path))
+                    } else if entry.kind == .file, let parent = location.path.parent {
+                        let screen = FileServiceBrowserViewController(backend: backend, path: parent)
+                        screen.opensSavedFileNamed = entry.name
+                        self.shell?.replace(screen)
+                    }
+                } catch {
+                    self?.report(error)
+                }
+            }
         case let .recent(path):
             openRecent(path)
         case let .catalog(id), let .connection(id):

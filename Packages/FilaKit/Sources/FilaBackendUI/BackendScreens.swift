@@ -68,6 +68,7 @@
             preview: (@MainActor () -> Void)?,
             text: (@MainActor () -> Void)?,
             code: (@MainActor () -> Void)?,
+            editText: (@MainActor () -> Void)?,
             table: (@MainActor () -> Void)?,
             openInApps: (@MainActor () -> Void)?
         )
@@ -124,6 +125,9 @@
         /// The app's Settings, over whatever is on top of `presenter`'s window;
         /// nothing when they are already open there.
         func presentSettings(from presenter: UIViewController)
+        /// Independent iPad left/right folder stacks sharing one existing
+        /// FileTransfer clipboard and drag/drop operation centre.
+        func presentTwoPanes(left: FileLocation, from presenter: UIViewController)
 
         /// The app's clipboard as a module screen sees it: nil while empty.
         /// `Notification.Name.filaClipboardChanged` says when to ask again.

@@ -63,6 +63,19 @@ final class FileBrowserViewController: BackendListViewController<FileNode>, TabC
     }
 
     private lazy var clipboardItem = makeClipboardItem { [weak self] mode in self?.paste(mode: mode) }
+    private lazy var twoPanesItem = UIBarButtonItem(
+        image: UIImage(systemName: "rectangle.split.2x1"),
+        primaryAction: UIAction { [weak self] _ in
+            guard let self,
+                  let path = session.local.servicePath(forAbsolute: directory) else { return }
+            BackendScreens.shell?.presentTwoPanes(
+                left: FileLocation(backend: session.local.id, path: path), from: self
+            )
+        }
+    ).then {
+        $0.accessibilityLabel = "Two Panes"
+        $0.title = "Two Panes"
+    }
     /// The list's own footer, once one has been dequeued. Weak because the
     /// collection view owns it and may recycle it; nil simply means there is
     /// nothing on screen to write the volume into yet.
@@ -349,7 +362,8 @@ final class FileBrowserViewController: BackendListViewController<FileNode>, TabC
     /// never in the trash, where nothing is pasted, nor during selection.
     private var barItems: [UIBarButtonItem] {
         let showsClipboard = !isEditing && !isTrash && !FileClipboard.shared.isEmpty
-        return [moreItem()] + (showsClipboard ? [clipboardItem] : [])
+        return [moreItem()] + (!isTrash && UIDevice.current.userInterfaceIdiom == .pad ? [twoPanesItem] : [])
+            + (showsClipboard ? [clipboardItem] : [])
     }
 
     /// The bottom bar's Search: the search screen for this folder.

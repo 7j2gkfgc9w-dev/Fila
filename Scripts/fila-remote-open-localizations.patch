@@ -1,8 +1,8 @@
 diff --git a/Fila/Resources/Localizable.xcstrings b/Fila/Resources/Localizable.xcstrings
-index 66cfd06..223c6ab 100644
+index 66cfd06..c18679a 100644
 --- a/Fila/Resources/Localizable.xcstrings
 +++ b/Fila/Resources/Localizable.xcstrings
-@@ -57889,6 +57889,708 @@
+@@ -57889,6 +57889,772 @@
            }
          }
        }
@@ -705,6 +705,70 @@ index 66cfd06..223c6ab 100644
 +          "stringUnit": {
 +            "state": "translated",
 +            "value": "Showing the first 1,000 rows."
++          }
++        }
++      }
++    },
++    "Edit Text": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Edit Text"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Редактировать текст"
++          }
++        }
++      }
++    },
++    "Two Panes": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Two Panes"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Две панели"
++          }
++        }
++      }
++    },
++    "Two panes need an iPad-size window.": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Two panes need an iPad-size window."
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Для двух панелей необходимо окно размером с экран iPad."
++          }
++        }
++      }
++    },
++    "Drag between panes, or Copy / Move and Paste": {
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Drag between panes, or Copy / Move and Paste"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Перетащите между панелями или используйте копирование / перемещение и вставку"
 +          }
 +        }
 +      }

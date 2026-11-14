@@ -29,6 +29,9 @@
         private var visitRecorded = false
         private var truncationReported = false
         private var snapshotTask: Task<Void, Never>?
+        /// Used by saved file shortcuts and search results. The file is opened
+        /// only after its actual parent has loaded, never guessed from its name.
+        public var opensSavedFileNamed: String?
         private let cell = UICollectionView.CellRegistration<BackendRowCell, FileEntry> { cell, _, entry in
             // No fallback: a file is never drawn as a glyph, and the shell that
             // owns the artwork always exists in the app.
@@ -50,13 +53,29 @@
             super.init()
             title = path.name ?? backend.root.displayName
             trailingNavigationItems = barItems
+            wantsSearchButton = true
             NotificationCenter.default.addObserver(self, selector: #selector(clipboardChanged), name: .filaClipboardChanged, object: nil)
         }
 
         /// The ellipsis, and the clipboard beside it while something is held.
         private var barItems: [UIBarButtonItem] {
-            [actionsItem] + (BackendScreens.shell?.clipboard == nil ? [] : [clipboardItem])
+            [actionsItem] +
+                (UIDevice.current.userInterfaceIdiom == .pad ? [twoPanesItem] : []) +
+                (BackendScreens.shell?.clipboard == nil ? [] : [clipboardItem])
         }
+
+        private lazy var twoPanesItem = UIBarButtonItem(
+            image: UIImage(systemName: "rectangle.split.2x1"),
+            primaryAction: UIAction { [weak self] _ in
+                guard let self else { return }
+                BackendScreens.shell?.presentTwoPanes(
+                    left: FileLocation(backend: backend.id, path: path), from: self
+                ).then {
+            $0.accessibilityLabel = "Two Panes"
+            $0.title = "Two Panes"
+        }
+            }
+        )
 
         @objc private func clipboardChanged() {
             trailingNavigationItems = barItems
@@ -138,6 +157,46 @@
                     )
                 }
             }
+            let search = UIAction(
+                title: String(localized: "Search in Folder", bundle: bundle),
+                image: UIImage(systemName: "magnifyingglass"),
+            ) { [weak self] _ in self?.search() }
+            let history = RemoteFolderHistory.shared
+            let previous = UIAction(
+                title: String(localized: "Previous Folder", bundle: bundle),
+                image: UIImage(systemName: "chevron.backward"),
+                attributes: history.canGoBack ? [] : .disabled
+            ) { _ in
+                if let destination = history.step(-1) {
+                    BackendScreens.shell?.open(destination)
+                }
+            }
+            let forward = UIAction(
+                title: String(localized: "Next Folder", bundle: bundle),
+                image: UIImage(systemName: "chevron.forward"),
+                attributes: history.canGoForward ? [] : .disabled
+            ) { _ in
+                if let destination = history.step(1) {
+                    BackendScreens.shell?.open(destination)
+                }
+            }
+            let recent: [UIMenuElement] = history.recent.map { location in
+                UIAction(
+                    title: (location.path.name ?? String(localized: "Root", bundle: bundle))
+                        + " · " + location.backend.rawValue,
+                    image: UIImage(systemName: "clock"),
+                ) { _ in
+                    history.jump(to: location)
+                    BackendScreens.shell?.open(
+                        BackendLocation(backend: location.backend, item: location.path.description)
+                    )
+                }
+            }
+            let historyMenu = UIMenu(
+                title: String(localized: "Folder History", bundle: bundle),
+                image: UIImage(systemName: "clock.arrow.circlepath"),
+                children: [previous, forward] + recent
+            )
             let refresh = UIAction(
                 title: String(localized: "Refresh", bundle: bundle),
                 image: UIImage(systemName: "arrow.clockwise"),
@@ -152,7 +211,8 @@
             }
             return [
                 UIMenu(options: .displayInline, children: [toggle]),
-                UIMenu(options: .displayInline, children: [newFolder, refresh]),
+                UIMenu(options: .displayInline, children: [newFolder, search, refresh]),
+                historyMenu,
                 settingsMenuElement,
             ]
         }
@@ -179,6 +239,15 @@
                     favoritesSnapshot = Set(snapshot.favorites.compactMap(\.path))
                 }
             }
+        }
+
+        /// Bounded recursive filename search, independent of the current
+        /// listing's 50,000-row visual limit.
+        override public func search() {
+            navigationController?.pushViewController(
+                RemoteFileSearchViewController(backend: backend, root: path),
+                animated: true
+            )
         }
 
         // MARK: - List hooks
@@ -265,6 +334,12 @@
             if !visitRecorded {
                 visitRecorded = true
                 try? backend.recordVisit(path)
+                RemoteFolderHistory.shared.record(FileLocation(backend: backend.id, path: path))
+            }
+            if let name = opensSavedFileNamed,
+               let saved = visible.first(where: { $0.name == name && $0.kind == .file }) {
+                opensSavedFileNamed = nil
+                open(saved)
             }
             if isTruncated, !truncationReported {
                 truncationReported = true
@@ -330,6 +405,10 @@
                         BackendScreens.shell?.previewCSVTable(file, title: entry.name, from: self, released: release)
                     }
                 }
+                let editor: (@MainActor () -> Void)? =
+                    textEnough && textTypes.contains(ext) && entry.kind == .file
+                    && entry.size.map { $0 <= RemoteTextEditorViewController.maximumBytes } == true
+                    ? { [weak self] in self?.editRemoteText(entry) } : nil
                 let openInApps: @MainActor () -> Void = { [weak self] in
                     guard let self else { return }
                     self.snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
@@ -343,6 +422,7 @@
                     preview: smallEnough ? preview : nil,
                     text: textEnough && textTypes.contains(ext) ? textPreview : nil,
                     code: textEnough && textTypes.contains(ext) ? codePreview : nil,
+                    editText: editor,
                     table: textEnough && (ext == "csv" || ext == "tsv") ? tablePreview : nil,
                     openInApps: smallEnough ? openInApps : nil
                 )
@@ -531,6 +611,33 @@
             BackendScreens.shell?.toast(String(localized: "Copied", bundle: bundle))
         }
 
+        /// A text edit is explicit. No large file is silently downloaded,
+        /// no binary or non-UTF-8 file is interpreted as text, and a successful
+        /// save keeps a separate server-side copy of the original.
+        private func editRemoteText(_ entry: FileEntry) {
+            guard entry.kind == .file, let size = entry.size,
+                  size <= RemoteTextEditorViewController.maximumBytes,
+                  let child = try? path.appending(entry.name),
+                  let shell = BackendScreens.shell else { return }
+            snapshot(entry, at: child, forPreview: true) { [weak self] file, release in
+                guard let self else { release(); return }
+                guard let editor = RemoteTextEditorViewController(
+                    backend: self.backend, path: child, metadata: entry,
+                    snapshot: file, released: release
+                ) else {
+                    release()
+                    shell.alert(
+                        title: String(localized: "Cannot Edit File", bundle: self.bundle),
+                        message: String(localized: "Only small UTF-8 text files can be edited.", bundle: self.bundle)
+                    )
+                    return
+                }
+                let navigation = UINavigationController(rootViewController: editor)
+                navigation.isModalInPresentation = true
+                self.present(navigation, animated: true)
+            }
+        }
+
         private func showRemoteInformation(_ entry: FileEntry) {
             guard let child = try? path.appending(entry.name) else { return }
             let kind: String
@@ -702,7 +809,7 @@
             return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
                 guard let self else { return nil }
                 var children: [UIMenuElement] = []
-                if entry.entersDirectory {
+                if entry.kind == .directory || entry.kind == .file {
                     let child = try? path.appending(entry.name)
                     let favorite = child.map { self.favoritesSnapshot.contains($0) } ?? false
                     children.append(UIAction(
@@ -714,7 +821,20 @@
                         guard let self, let child else { return }
                         try? backend.setFavorite(child, included: !favorite)
                     })
-                } else {
+                }
+                if entry.kind == .file {
+                    let supported: Set<String> = [
+                        "txt", "md", "csv", "tsv", "json", "xml", "yaml", "yml",
+                        "ini", "conf", "cfg", "swift", "py", "js", "ts",
+                        "html", "css", "sh", "sql", "toml", "log"
+                    ]
+                    if let size = entry.size, size <= RemoteTextEditorViewController.maximumBytes,
+                       supported.contains((entry.name as NSString).pathExtension.lowercased()) {
+                        children.append(UIAction(
+                            title: String(localized: "Edit Text", bundle: bundle),
+                            image: UIImage(systemName: "square.and.pencil")
+                        ) { [weak self] _ in self?.editRemoteText(entry) })
+                    }
                     children.append(UIAction(
                         title: String(localized: "Preview", bundle: bundle),
                         image: UIImage(systemName: "eye"),
@@ -810,4 +930,431 @@
             return FileLocation(backend: backend.id, path: path)
         }
     }
+
+// MARK: - Persistent remote-folder navigation history
+
+@MainActor
+private final class RemoteFolderHistory {
+    static let shared = RemoteFolderHistory()
+    private struct Saved: Codable {
+        var locations: [FileLocation]
+        var position: Int
+    }
+    private let key = "fila.remote.folder.history.v1"
+    private var locations: [FileLocation] = []
+    private var position = -1
+
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let saved = try? JSONDecoder().decode(Saved.self, from: data) {
+            locations = Array(saved.locations.suffix(60))
+            position = min(max(saved.position, -1), locations.count - 1)
+        }
+    }
+
+    var canGoBack: Bool { position > 0 }
+    var canGoForward: Bool { position >= 0 && position + 1 < locations.count }
+    var recent: [FileLocation] { Array(locations.suffix(12).reversed()) }
+
+    func record(_ location: FileLocation) {
+        if position >= 0, position < locations.count, locations[position] == location { return }
+        if position + 1 < locations.count {
+            locations.removeSubrange((position + 1)..<locations.count)
+        }
+        locations.append(location)
+        if locations.count > 60 { locations.removeFirst(locations.count - 60) }
+        position = locations.count - 1
+        save()
+    }
+
+    func step(_ amount: Int) -> BackendLocation? {
+        let next = position + amount
+        guard locations.indices.contains(next) else { return nil }
+        position = next
+        save()
+        let location = locations[next]
+        return BackendLocation(backend: location.backend, item: location.path.description)
+    }
+
+    func jump(to location: FileLocation) {
+        if let index = locations.lastIndex(of: location) {
+            position = index
+            save()
+        }
+    }
+
+    private func save() {
+        if let data = try? JSONEncoder().encode(Saved(locations: locations, position: position)) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+}
+
+// MARK: - Bounded recursive search (no server-wide unbounded enumeration)
+
+@MainActor
+private final class RemoteFileSearchViewController: UIViewController, UISearchBarDelegate,
+    UITableViewDataSource, UITableViewDelegate
+{
+    private struct Hit {
+        let path: ServicePath
+        let entry: FileEntry
+    }
+
+    private let backend: any FileBackend
+    private let origin: ServicePath
+    private let searchBar = UISearchBar()
+    private let kindControl = UISegmentedControl(items: ["All", "Files", "Folders"])
+    private let table = UITableView(frame: .zero, style: .plain)
+    private var matches: [Hit] = []
+    private var searchTask: Task<Void, Never>?
+    private var newerThanDays: Int?
+    private var minimumSize: Int64?
+    private var maximumSize: Int64?
+    private let maximumScanned = 5_000
+    private let maximumDepth = 8
+    private let maximumMatches = 250
+
+    init(backend: any FileBackend, root: ServicePath) {
+        self.backend = backend
+        origin = root
+        super.init(nibName: nil, bundle: nil)
+        title = String(localized: "Search Files", bundle: .module)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("not supported") }
+    deinit { searchTask?.cancel() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        searchBar.placeholder = String(localized: "Filename contains…", bundle: .module)
+        searchBar.delegate = self
+        searchBar.returnKeyType = .search
+        kindControl.selectedSegmentIndex = 0
+        kindControl.addTarget(self, action: #selector(restartSearch), for: .valueChanged)
+        table.dataSource = self
+        table.delegate = self
+        table.keyboardDismissMode = .onDrag
+        let stack = UIStackView(arrangedSubviews: [searchBar, kindControl, table])
+        stack.axis = .vertical
+        stack.spacing = 8
+        view.addSubview(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+        ])
+
+        let sizeMenu = UIMenu(title: String(localized: "Size", bundle: .module), children: [
+            UIAction(title: String(localized: "Any Size", bundle: .module)) { [weak self] _ in
+                self?.minimumSize = nil; self?.maximumSize = nil; self?.restartSearch()
+            },
+            UIAction(title: String(localized: "Under 10 MB", bundle: .module)) { [weak self] _ in
+                self?.minimumSize = nil; self?.maximumSize = 10_000_000; self?.restartSearch()
+            },
+            UIAction(title: String(localized: "Over 100 MB", bundle: .module)) { [weak self] _ in
+                self?.minimumSize = 100_000_000; self?.maximumSize = nil; self?.restartSearch()
+            },
+        ])
+        let dateMenu = UIMenu(title: String(localized: "Modified", bundle: .module), children: [
+            UIAction(title: String(localized: "Any Date", bundle: .module)) { [weak self] _ in
+                self?.newerThanDays = nil; self?.restartSearch()
+            },
+            UIAction(title: String(localized: "Last 7 Days", bundle: .module)) { [weak self] _ in
+                self?.newerThanDays = 7; self?.restartSearch()
+            },
+            UIAction(title: String(localized: "Last 30 Days", bundle: .module)) { [weak self] _ in
+                self?.newerThanDays = 30; self?.restartSearch()
+            },
+        ])
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "line.3.horizontal.decrease.circle"),
+            menu: UIMenu(children: [sizeMenu, dateMenu])
+        )
+        searchBar.becomeFirstResponder()
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
+        restartSearch()
+    }
+
+    @objc private func restartSearch() {
+        searchTask?.cancel()
+        matches = []
+        table.reloadData()
+        guard let term = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !term.isEmpty else {
+            title = String(localized: "Search Files", bundle: .module)
+            return
+        }
+        let kind = kindControl.selectedSegmentIndex
+        let days = newerThanDays
+        let minBytes = minimumSize
+        let maxBytes = maximumSize
+        searchTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let service = try await backend.fileService()
+                var folders: [(path: ServicePath, depth: Int)] = [(origin, 0)]
+                var index = 0
+                var scanned = 0
+                while index < folders.count, scanned < maximumScanned,
+                      matches.count < maximumMatches {
+                    try Task.checkCancellation()
+                    let current = folders[index]
+                    index += 1
+                    for try await batch in try await service.list(current.path) {
+                        try Task.checkCancellation()
+                        for entry in batch {
+                            scanned += 1
+                            guard let child = try? current.path.appending(entry.name) else { continue }
+                            if entry.kind == .directory, current.depth < maximumDepth {
+                                folders.append((child, current.depth + 1))
+                            }
+                            let kindFits = kind == 0 ||
+                                (kind == 1 && entry.kind == .file) ||
+                                (kind == 2 && entry.entersDirectory)
+                            let sizeFits = (minBytes == nil || (entry.size.map { $0 >= minBytes! } == true))
+                                && (maxBytes == nil || (entry.size.map { $0 <= maxBytes! } == true))
+                            let dateFits = days == nil || (entry.modified.map {
+                                $0 >= Date().addingTimeInterval(-Double(days!) * 86_400)
+                            } == true)
+                            if kindFits && sizeFits && dateFits &&
+                               entry.name.localizedStandardContains(term) {
+                                matches.append(Hit(path: child, entry: entry))
+                            }
+                            if scanned >= maximumScanned || matches.count >= maximumMatches { break }
+                        }
+                        if scanned >= maximumScanned || matches.count >= maximumMatches { break }
+                    }
+                    if index % 4 == 0 || matches.count >= maximumMatches {
+                        table.reloadData()
+                        title = String(localized: "Found", bundle: .module) + " \(matches.count)"
+                    }
+                }
+                table.reloadData()
+                title = String(localized: "Found", bundle: .module) + " \(matches.count)"
+                    + (scanned >= maximumScanned ? " (limited)" : "")
+            } catch is CancellationError {
+                // A new search replaces this one without an error card.
+            } catch {
+                BackendScreens.shell?.alert(
+                    title: String(localized: "Search Failed", bundle: .module),
+                    message: BackendScreens.shell?.failureText(for: error) ?? error.localizedDescription
+                )
+            }
+        }
+    }
+
+    func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int { matches.count }
+    func tableView(_: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let hit = matches[indexPath.row]
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = hit.entry.name
+        cell.detailTextLabel?.text = hit.path.description
+        cell.imageView?.image = UIImage(systemName: hit.entry.entersDirectory ? "folder" : "doc")
+        cell.accessoryType = .disclosureIndicator
+        return cell
+    }
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let hit = matches[indexPath.row]
+        let directory = hit.entry.entersDirectory ? hit.path : (hit.path.parent ?? origin)
+        let browser = FileServiceBrowserViewController(backend: backend, path: directory)
+        if !hit.entry.entersDirectory { browser.opensSavedFileNamed = hit.entry.name }
+        navigationController?.pushViewController(browser, animated: true)
+    }
+}
+
+// MARK: - Safe UTF-8 editor with remote conflict detection and backups
+
+@MainActor
+private final class RemoteTextEditorViewController: UIViewController {
+    static let maximumBytes: Int64 = 2 * 1024 * 1024
+
+    private let backend: any FileBackend
+    private let path: ServicePath
+    private let originalMetadata: FileEntry
+    private let snapshot: URL
+    private let original: Data
+    private let onRelease: () -> Void
+    private let editor = UITextView()
+    private var saving = false
+    private var workspaceReleased = false
+
+    init?(backend: any FileBackend, path: ServicePath, metadata: FileEntry,
+          snapshot: URL, released: @escaping () -> Void) {
+        guard let data = try? Data(contentsOf: snapshot, options: .mappedIfSafe),
+              data.count <= Int(Self.maximumBytes),
+              String(data: data, encoding: .utf8) != nil else { return nil }
+        self.backend = backend
+        self.path = path
+        originalMetadata = metadata
+        self.snapshot = snapshot
+        original = data
+        onRelease = released
+        super.init(nibName: nil, bundle: nil)
+        title = path.name
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        if isBeingDismissed || navigationController?.isBeingDismissed == true {
+            guard !workspaceReleased else { return }
+            workspaceReleased = true
+            onRelease()
+        }
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        editor.text = String(data: original, encoding: .utf8) ?? ""
+        editor.font = .monospacedSystemFont(ofSize: 15, weight: .regular)
+        editor.autocorrectionType = .no
+        editor.autocapitalizationType = .none
+        editor.alwaysBounceVertical = true
+        view.addSubview(editor)
+        editor.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            editor.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            editor.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            editor.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            editor.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+        ])
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            systemItem: .cancel,
+            primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
+        )
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            systemItem: .save,
+            primaryAction: UIAction { [weak self] _ in self?.save() }
+        )
+    }
+
+    private func save() {
+        guard !saving, let contents = editor.text.data(using: .utf8),
+              contents.count <= Int(Self.maximumBytes) else {
+            BackendScreens.shell?.alert(
+                title: String(localized: "Cannot Edit File", bundle: .module),
+                message: String(localized: "Text is over the 2 MB editing limit.", bundle: .module)
+            )
+            return
+        }
+        guard contents != original else {
+            dismiss(animated: true)
+            return
+        }
+        saving = true
+        navigationItem.rightBarButtonItem?.isEnabled = false
+        let backend = backend
+        let path = path
+        let baseline = originalMetadata
+        let original = original
+        let snapshot = snapshot
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                saving = false
+                navigationItem.rightBarButtonItem?.isEnabled = true
+            }
+            do {
+                guard let shell = BackendScreens.shell else { return }
+                let backupName = try await shell.withProgress(
+                    title: String(localized: "Saving Text", bundle: .module),
+                    message: String(localized: "Checking for changes and backing up…", bundle: .module),
+                    cancellable: true, from: self
+                ) { update -> String in
+                    let service = try await backend.fileService()
+                    guard let writable = service as? any WritableFileService else {
+                        throw NSError(domain: "Fila.TextEditor", code: 405,
+                                      userInfo: [NSLocalizedDescriptionKey: "Server is read-only."])
+                    }
+                    let current = try await service.details(path)
+                    guard current.kind == .file, current.size == baseline.size,
+                          current.modified == baseline.modified else {
+                        throw NSError(domain: "Fila.TextEditor", code: 409,
+                                      userInfo: [NSLocalizedDescriptionKey:
+                                        "This file changed on the server. It was not overwritten."])
+                    }
+
+                    // Compare the actual bytes, even on servers without timestamps.
+                    let temp = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("fila-edit-check-\(UUID().uuidString)")
+                    defer { try? FileManager.default.removeItem(at: temp) }
+                    let verifyFD = Darwin.open(temp.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+                    guard verifyFD >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+                    do {
+                        try await service.copyContents(of: path, to: verifyFD) { _ in }
+                        close(verifyFD)
+                    } catch {
+                        close(verifyFD)
+                        throw error
+                    }
+                    guard try Data(contentsOf: temp) == original else {
+                        throw NSError(domain: "Fila.TextEditor", code: 409,
+                                      userInfo: [NSLocalizedDescriptionKey:
+                                        "The remote file changed. Refresh before saving."])
+                    }
+                    try Task.checkCancellation()
+                    guard let parent = path.parent else {
+                        throw NSError(domain: "Fila.TextEditor", code: 400)
+                    }
+                    // Backup is on the same server and never replaces another file.
+                    let safePrefix = String((path.name ?? "text").prefix(90))
+                    let suffix = ISO8601DateFormatter().string(from: Date())
+                        .replacingOccurrences(of: ":", with: "-")
+                    let backupName = "." + safePrefix + ".fila-backup-" + suffix
+                    let backupPath = try parent.appending(backupName)
+                    let sourceFD = Darwin.open(snapshot.path, O_RDONLY | O_CLOEXEC)
+                    guard sourceFD >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+                    defer { close(sourceFD) }
+                    try await writable.writeFile(from: sourceFD, size: Int64(original.count),
+                                                 to: backupPath, policy: .failIfExists) { _ in }
+                    let confirmed = try await service.details(backupPath)
+                    guard confirmed.kind == .file, confirmed.size == Int64(original.count) else {
+                        throw NSError(domain: "Fila.TextEditor", code: 500,
+                                      userInfo: [NSLocalizedDescriptionKey:
+                                        "Could not verify server backup; original left unchanged."])
+                    }
+                    try Task.checkCancellation()
+                    update(String(localized: "Uploading changes…", bundle: .module))
+                    let upload = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("fila-edit-new-\(UUID().uuidString)")
+                    defer { try? FileManager.default.removeItem(at: upload) }
+                    try contents.write(to: upload, options: .atomic)
+                    let uploadFD = Darwin.open(upload.path, O_RDONLY | O_CLOEXEC)
+                    guard uploadFD >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+                    defer { close(uploadFD) }
+                    try await writable.writeFile(from: uploadFD, size: Int64(contents.count),
+                                                 to: path, policy: .replace) { _ in }
+                    let result = try await service.details(path)
+                    guard result.kind == .file, result.size == Int64(contents.count) else {
+                        throw NSError(domain: "Fila.TextEditor", code: 500,
+                                      userInfo: [NSLocalizedDescriptionKey:
+                                        "Remote save could not be verified. Check the file."])
+                    }
+                    backend.invalidate([parent])
+                    return backupName
+                }
+                shell.toast(String(localized: "Saved. Backup:", bundle: .module) + " " + backupName)
+                dismiss(animated: true)
+            } catch is CancellationError {
+                // The backup may already have been published; no source was
+                // ever deleted and no unfinished file is exposed.
+            } catch {
+                BackendScreens.shell?.alert(
+                    title: String(localized: "Could Not Save", bundle: .module),
+                    message: BackendScreens.shell?.failureText(for: error) ?? error.localizedDescription
+                )
+            }
+        }
+    }
+}
 #endif

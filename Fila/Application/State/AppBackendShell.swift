@@ -115,6 +115,7 @@ final class AppBackendShell: BackendShell {
         preview: (@MainActor () -> Void)?,
         text: (@MainActor () -> Void)?,
         code: (@MainActor () -> Void)?,
+        editText: (@MainActor () -> Void)?,
         table: (@MainActor () -> Void)?,
         openInApps: (@MainActor () -> Void)?
     ) {
@@ -151,6 +152,11 @@ final class AppBackendShell: BackendShell {
             if let code {
                 context.addAction(title: String.LocalizationValue("View as Code")) {
                     context.dispose { code() }
+                }
+            }
+            if let editText {
+                context.addAction(title: String.LocalizationValue("Edit Text")) {
+                    context.dispose { editText() }
                 }
             }
             if let preview {
@@ -532,6 +538,17 @@ final class AppBackendShell: BackendShell {
         ClipboardPaste.paste(into: FileReference(destination), mode: mode, from: presenter)
     }
 
+    func presentTwoPanes(left: FileLocation, from presenter: UIViewController) {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            alert(title: String(localized: "Two Panes"), message: String(localized: "Two panes need an iPad-size window."))
+            return
+        }
+        let controller = DualPaneFileManagerViewController(left: left)
+        let navigation = UINavigationController(rootViewController: controller)
+        navigation.modalPresentationStyle = .fullScreen
+        presenter.present(navigation, animated: true)
+    }
+
     func presentClipboard(from presenter: UIViewController) {
         let session = session
         TopPresenter.whenReady(from: presenter.view.window?.rootViewController) { top in
@@ -586,5 +603,112 @@ private final class ReleaseOnDeinit {
 
     deinit {
         release()
+    }
+}
+
+
+// MARK: - iPad two-pane file manager
+
+/// Two independent folder stacks use the existing FileBrowser and
+/// FileServiceBrowser. Their clipboard and drag/drop are the *same* operation
+/// centre as a normal tab; no second transfer implementation or unsafe direct
+/// SMB write path is introduced. Files can be dragged across the divider,
+/// or Copy/Move on one pane and Paste on the other.
+@MainActor
+private final class DualPaneFileManagerViewController: UIViewController {
+    private let initial: FileLocation
+    private let leftNavigation = UINavigationController()
+    private let rightNavigation = UINavigationController()
+    private let divider = UIView()
+
+    init(left: FileLocation) {
+        initial = left
+        super.init(nibName: nil, bundle: nil)
+        title = String(localized: "Two Panes")
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            systemItem: .done,
+            primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
+        )
+        navigationItem.rightBarButtonItems = [
+            picker(forLeft: false), picker(forLeft: true)
+        ]
+
+        addChild(leftNavigation)
+        addChild(rightNavigation)
+        let tip = UILabel()
+        tip.text = String(localized: "Drag between panes, or Copy / Move and Paste")
+        tip.font = .preferredFont(forTextStyle: .caption1)
+        tip.textColor = .secondaryLabel
+        tip.textAlignment = .center
+        tip.numberOfLines = 2
+        let folderPair = UIStackView(arrangedSubviews: [leftNavigation.view, divider, rightNavigation.view])
+        folderPair.axis = .horizontal
+        folderPair.alignment = .fill
+        folderPair.distribution = .fill
+        folderPair.spacing = 0
+        divider.backgroundColor = .separator
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.widthAnchor.constraint(equalToConstant: 1).isActive = true
+
+        let container = UIStackView(arrangedSubviews: [tip, folderPair])
+        container.axis = .vertical
+        container.spacing = 7
+        view.addSubview(container)
+        container.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            leftNavigation.view.widthAnchor.constraint(equalTo: rightNavigation.view.widthAnchor),
+            tip.heightAnchor.constraint(greaterThanOrEqualToConstant: 22),
+        ])
+
+        leftNavigation.didMove(toParent: self)
+        rightNavigation.didMove(toParent: self)
+        open(initial, left: true)
+        if let other = BackendComposition.fileBackends.first(where: { $0.id != initial.backend }) {
+            open(FileLocation(backend: other.id, path: .root), left: false)
+        } else {
+            open(initial, left: false)
+        }
+    }
+
+    private func picker(forLeft left: Bool) -> UIBarButtonItem {
+        UIBarButtonItem(
+            image: UIImage(systemName: left ? "sidebar.left" : "sidebar.right"),
+            menu: UIMenu(children: [
+                UIDeferredMenuElement.uncached { [weak self] done in
+                    guard let self else { done([]); return }
+                    let options: [UIMenuElement] = BackendComposition.fileBackends.map { backend in
+                        UIAction(title: backend.root.displayName, image: UIImage(systemName: "folder")) { [weak self] _ in
+                            self?.open(FileLocation(backend: backend.id, path: .root), left: left)
+                        }
+                    }
+                    done(options)
+                }
+            ])
+        )
+    }
+
+    private func open(_ location: FileLocation, left: Bool) {
+        guard let backend = BackendComposition.fileBackends.first(
+            where: { $0.id == location.backend }
+        ) else { return }
+        let browser: UIViewController
+        if let local = backend as? LocalFileBackend {
+            browser = FileBrowserViewController(directory: local.absolutePath(location.path))
+        } else {
+            browser = FileServiceBrowserViewController(backend: backend, path: location.path)
+        }
+        let target = left ? leftNavigation : rightNavigation
+        target.setViewControllers([browser], animated: false)
     }
 }
