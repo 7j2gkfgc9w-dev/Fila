@@ -187,32 +187,22 @@ final class AppBackendShell: BackendShell {
         presenter.present(alert, animated: true)
     }
 
-    /// Preserve the percent-encoded UTF-8 file path exactly once for VLC.
-    /// The VLC x-callback query re-escapes %D0 as %25D0, which VLC iOS
-    /// historically mishandles for Cyrillic, spaces, or percent in filenames.
-    /// The direct vlc://URL form avoids the extra decoding boundary.
-    /// Plain ASCII HTTP URLs keep the existing x-callback behavior.
+    /// VLC interprets vlc://<nested SMB URL> as invalid http://smb://...
+    /// Use VLC's supported x-callback stream action instead.
+    /// The original smb:// URL goes into the outer query as a value.
+    /// URLComponents escapes the nested URL for that query; after one
+    /// query-decoding step VLC receives the unmodified UTF-8 SMB path.
     /// Infuse x-callback is only offered for HTTP(S), not SMB.
     private func launchRemotePlayer(_ scheme: String, url: URL, name: String) {
-        let isVLC = scheme == "vlc-x-callback"
-        let directVLC = isVLC && (
-            url.scheme?.lowercased() == "smb" || url.absoluteString.contains("%")
-        )
-        let target: URL?
-        if directVLC {
-            target = URL(string: "vlc://" + url.absoluteString)
-        } else {
-            var components = URLComponents()
-            components.scheme = scheme
-            components.host = "x-callback-url"
-            components.path = scheme == "infuse" ? "/play" : "/stream"
-            components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
-            if scheme == "infuse" {
-                components.queryItems?.append(URLQueryItem(name: "filename", value: name))
-            }
-            target = components.url
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = "x-callback-url"
+        components.path = scheme == "infuse" ? "/play" : "/stream"
+        components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+        if scheme == "infuse" {
+            components.queryItems?.append(URLQueryItem(name: "filename", value: name))
         }
-        guard let target else { return }
+        guard let target = components.url else { return }
         UIApplication.shared.open(target, options: [:]) { success in
             guard !success else { return }
             Task { @MainActor in
